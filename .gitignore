@@ -1,0 +1,17 @@
+# Unreal Engine generated files
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# macOS
+.DS_Store
+
+# IDE files
+.vs/
+.idea/
+
+# Visual Studio
+*.suo
+*.user
+*.userosscache
