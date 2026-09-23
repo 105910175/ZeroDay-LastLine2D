@@ -15,3 +15,7 @@ Saved/
 *.suo
 *.user
 *.userosscache
+
+# Unreal/Xcode generated files
+Build/
+*.xcworkspace/
