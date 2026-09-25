@@ -68,18 +68,18 @@ void AZeroDayCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 void AZeroDayCharacter::MoveForward(float Value)
 {
-	if (Value != 0.f)
-	{
-		AddMovementInput(FVector::ForwardVector, Value);
-	}
+    if (Value != 0.f)
+    {
+        AddMovementInput(FVector::RightVector, Value);
+    }
 }
 
 void AZeroDayCharacter::MoveRight(float Value)
 {
-	if (Value != 0.f)
-	{
-		AddMovementInput(FVector::RightVector, Value);
-	}
+    if (Value != 0.f)
+    {
+        AddMovementInput(FVector::ForwardVector, -Value);
+    }
 }
 
 FVector AZeroDayCharacter::GetGroundAimPoint() const
