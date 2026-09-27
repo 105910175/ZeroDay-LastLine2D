@@ -39,6 +39,7 @@ namespace
 	}
 }
 
+// Draw order matters: world markers first so the panels sit on top of them.
 void AZeroDayHUD::DrawHUD()
 {
 	Super::DrawHUD();
@@ -68,6 +69,7 @@ void AZeroDayHUD::DrawHUD()
 	}
 }
 
+// Measures the text so it can be centred horizontally.
 void AZeroDayHUD::DrawCenteredText(const FString& Text, const FLinearColor& Color, float Y, float Scale)
 {
 	float Width = 0.f;
@@ -76,6 +78,7 @@ void AZeroDayHUD::DrawCenteredText(const FString& Text, const FLinearColor& Colo
 	DrawText(Text, Color, (Canvas->SizeX - Width) * 0.5f, Y, GEngine->GetMediumFont(), Scale, false);
 }
 
+// Four lines make a hollow square (the canvas has no outline rectangle).
 void AZeroDayHUD::DrawSquare(float CenterX, float CenterY, float HalfSize, const FLinearColor& Color)
 {
 	DrawLine(CenterX - HalfSize, CenterY - HalfSize, CenterX + HalfSize, CenterY - HalfSize, Color, 2.f);
@@ -84,6 +87,7 @@ void AZeroDayHUD::DrawSquare(float CenterX, float CenterY, float HalfSize, const
 	DrawLine(CenterX - HalfSize, CenterY + HalfSize, CenterX - HalfSize, CenterY - HalfSize, Color, 2.f);
 }
 
+// Level number, time left to hold out, and resources.
 void AZeroDayHUD::DrawTopBar(const AZeroDayGameMode& GameMode)
 {
 	DrawRect(PanelColor, 0.f, 0.f, Canvas->SizeX, TopBarHeight);
@@ -102,6 +106,7 @@ void AZeroDayHUD::DrawTopBar(const AZeroDayGameMode& GameMode)
 	DrawText(ResourceText, TextColor, Canvas->SizeX - Width - 12.f, 8.f, Font, 1.f, false);
 }
 
+// One row per active wall and city task: name, health bar and status.
 void AZeroDayHUD::DrawStatusPanel(const AZeroDayGameMode& GameMode)
 {
 	UFont* Font = GEngine->GetMediumFont();
@@ -174,6 +179,7 @@ void AZeroDayHUD::DrawStatusPanel(const AZeroDayGameMode& GameMode)
 	}
 }
 
+// Boxes around scanned threats. Unvalidated ones show '?', validated ones show severity or FALSE POSITIVE.
 void AZeroDayHUD::DrawThreatMarkers()
 {
 	UFont* Font = GEngine->GetMediumFont();
@@ -205,6 +211,7 @@ void AZeroDayHUD::DrawThreatMarkers()
 	}
 }
 
+// Red '!' on walls with detected exposure, pinned to the screen edge if the wall is off camera.
 void AZeroDayHUD::DrawWallMarkers(const AZeroDayGameMode& GameMode)
 {
 	UFont* Font = GEngine->GetMediumFont();
@@ -238,6 +245,7 @@ void AZeroDayHUD::DrawWallMarkers(const AZeroDayGameMode& GameMode)
 	}
 }
 
+// Scan, validate and wall messages from the game mode.
 void AZeroDayHUD::DrawAlerts(const AZeroDayGameMode& GameMode)
 {
 	UFont* Font = GEngine->GetMediumFont();
@@ -263,6 +271,7 @@ void AZeroDayHUD::DrawAlerts(const AZeroDayGameMode& GameMode)
 	}
 }
 
+// Key reminder along the bottom, including the Insta Scan cooldown.
 void AZeroDayHUD::DrawControlsHint()
 {
 	FString ScanText = TEXT("Q Insta Scan: ready");
@@ -283,6 +292,7 @@ void AZeroDayHUD::DrawControlsHint()
 	DrawCenteredText(Hint, MutedColor, Canvas->SizeY - 27.f, 0.85f);
 }
 
+// Start-of-level objective, so a first-time player knows what to do.
 void AZeroDayHUD::DrawObjectiveBanner(const AZeroDayGameMode& GameMode)
 {
 	// Only show the objective at the start of a level so it doesn't clutter play.
@@ -296,6 +306,7 @@ void AZeroDayHUD::DrawObjectiveBanner(const AZeroDayGameMode& GameMode)
 	DrawCenteredText(GameMode.GetObjectiveText(), TextColor, Canvas->SizeY * 0.3f + 24.f, 0.95f);
 }
 
+// Win/lose overlay with the reason and what to press next.
 void AZeroDayHUD::DrawEndScreen(const AZeroDayGameMode& GameMode)
 {
 	const bool bWon = GameMode.DidPlayerWin();

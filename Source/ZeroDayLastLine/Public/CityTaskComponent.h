@@ -17,18 +17,23 @@ class ZERODAYLASTLINE_API UCityTaskComponent : public UActorComponent
 public:
 	UCityTaskComponent();
 
+	// How much condition (0-100) is lost per second.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CityTask")
 	float DecayRatePerSecond = 2.f;
 
+	// Condition at or below which the task is considered critical.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CityTask")
 	float CriticalThreshold = 25.f;
 
+	// Fired once when condition first drops to the critical threshold.
 	UPROPERTY(BlueprintAssignable, Category = "CityTask")
 	FOnTaskBecameCritical OnBecameCritical;
 
+	// Fired when the player attends the task and it resets.
 	UPROPERTY(BlueprintAssignable, Category = "CityTask")
 	FOnTaskAttended OnAttended;
 
+	// Resets condition to full and clears the critical flag.
 	UFUNCTION(BlueprintCallable, Category = "CityTask")
 	void Attend();
 
@@ -43,9 +48,11 @@ protected:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	// Current condition, 0-100.
 	UPROPERTY(Transient)
 	float Condition = 100.f;
 
+	// True from the moment condition drops to the threshold until the task is attended.
 	UPROPERTY(Transient)
 	bool bIsCritical = false;
 };

@@ -20,9 +20,11 @@ public:
 	// Sets default values for this character's properties
 	AZeroDayCharacter();
 
+	// What the player fires.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Combat")
 	TSubclassOf<AZeroDayProjectile> ProjectileClass;
 
+	// How close the player must be to a wall or task to use it with E.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Combat")
 	float InteractRange = 250.f;
 
@@ -46,9 +48,11 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 protected:
+	// Holds the camera above and behind the player.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Camera")
 	TObjectPtr<USpringArmComponent> CameraBoom;
 
+	// The top-down view.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Camera")
 	TObjectPtr<UCameraComponent> TopDownCamera;
 
@@ -57,6 +61,7 @@ protected:
 	TObjectPtr<UDetectionComponent> Detection;
 
 private:
+	// Input handlers, bound in SetupPlayerInputComponent.
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 	void Fire();
@@ -64,5 +69,6 @@ private:
 	void RestartLevel();
 	void NextLevel();
 
+	// World position under the mouse cursor, on the player's ground plane.
 	FVector GetGroundAimPoint() const;
 };

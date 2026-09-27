@@ -26,6 +26,7 @@ AZeroDayCharacter::AZeroDayCharacter()
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 720.f, 0.f);
 
+	// Top-down camera on a boom that doesn't collide with the level.
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 1200.f;
@@ -37,6 +38,7 @@ AZeroDayCharacter::AZeroDayCharacter()
 	TopDownCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	TopDownCamera->bUsePawnControlRotation = false;
 
+	// Insta Scan and Validate live in their own component.
 	Detection = CreateDefaultSubobject<UDetectionComponent>(TEXT("Detection"));
 }
 
@@ -77,6 +79,7 @@ void AZeroDayCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("NextLevel", IE_Pressed, this, &AZeroDayCharacter::NextLevel);
 }
 
+// W/S. The world direction comes from ForwardInputDirection so it can match the level's orientation.
 void AZeroDayCharacter::MoveForward(float Value)
 {
 	if (Value != 0.f)
@@ -85,6 +88,7 @@ void AZeroDayCharacter::MoveForward(float Value)
 	}
 }
 
+// A/D. The world direction comes from RightInputDirection.
 void AZeroDayCharacter::MoveRight(float Value)
 {
 	if (Value != 0.f)
@@ -93,6 +97,7 @@ void AZeroDayCharacter::MoveRight(float Value)
 	}
 }
 
+// Falls back to a point in front of the player if the cursor ray can't be resolved.
 FVector AZeroDayCharacter::GetGroundAimPoint() const
 {
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -113,6 +118,7 @@ FVector AZeroDayCharacter::GetGroundAimPoint() const
 	return GetActorLocation() + GetActorForwardVector() * 500.f;
 }
 
+// Fires a projectile from the player towards the mouse cursor, flat on the ground plane.
 void AZeroDayCharacter::Fire()
 {
 	if (!ProjectileClass)
@@ -134,6 +140,7 @@ void AZeroDayCharacter::Fire()
 	GetWorld()->SpawnActor<AZeroDayProjectile>(ProjectileClass, Start, AimDirection.Rotation(), SpawnParams);
 }
 
+// E: fixes the first wall in range, otherwise attends the first city task in range.
 void AZeroDayCharacter::Interact()
 {
 	TArray<AActor*> NearbyWalls;
@@ -161,6 +168,7 @@ void AZeroDayCharacter::Interact()
 	}
 }
 
+// R: reload the current level.
 void AZeroDayCharacter::RestartLevel()
 {
 	if (AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this)))
@@ -169,6 +177,7 @@ void AZeroDayCharacter::RestartLevel()
 	}
 }
 
+// N: load the next level (only does anything after a win).
 void AZeroDayCharacter::NextLevel()
 {
 	if (AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this)))

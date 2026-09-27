@@ -6,6 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
 
+// Builds the station: a solid mesh plus the shared decay and timer components.
 ACityTaskActor::ACityTaskActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -27,6 +28,7 @@ ACityTaskActor::ACityTaskActor()
 	GraceTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("GraceTimer"));
 }
 
+// Wire the decay meter to the grace timer: critical starts it, attending cancels it, expiry fails the task.
 void ACityTaskActor::BeginPlay()
 {
 	Super::BeginPlay();
@@ -36,6 +38,7 @@ void ACityTaskActor::BeginPlay()
 	GraceTimer->OnExpired.AddDynamic(this, &ACityTaskActor::HandleGraceExpired);
 }
 
+// Attending costs a resource. If the player can't pay, nothing happens.
 void ACityTaskActor::Attend()
 {
 	if (!bIsActiveThisLevel || bFailed)
@@ -54,11 +57,13 @@ void ACityTaskActor::Attend()
 	TaskComp->Attend();
 }
 
+// Current condition (0-100), for the HUD.
 float ACityTaskActor::GetCondition() const
 {
 	return TaskComp->GetCondition();
 }
 
+// Inactive tasks are hidden and stop decaying.
 void ACityTaskActor::SetActiveThisLevel(bool bActive)
 {
 	bIsActiveThisLevel = bActive;
@@ -66,16 +71,19 @@ void ACityTaskActor::SetActiveThisLevel(bool bActive)
 	TaskComp->SetComponentTickEnabled(bActive);
 }
 
+// Condition hit the threshold: the player now has GracePeriodSeconds to respond.
 void ACityTaskActor::HandleBecameCritical()
 {
 	GraceTimer->StartCooldown(GracePeriodSeconds, false);
 }
 
+// Player responded in time, so the grace period is cancelled.
 void ACityTaskActor::HandleAttended()
 {
 	GraceTimer->CancelCooldown();
 }
 
+// Ran out of time while still critical: the task has failed.
 void ACityTaskActor::HandleGraceExpired()
 {
 	if (TaskComp->IsCritical() && !bFailed)

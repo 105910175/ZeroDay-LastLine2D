@@ -4,11 +4,13 @@
 #include "ZeroDayTypes.h"
 #include "Kismet/GameplayStatics.h"
 
+// No tick: everything happens in response to player input.
 UDetectionComponent::UDetectionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
+// Seconds until Insta Scan can be used again, for the HUD.
 float UDetectionComponent::GetScanCooldownRemaining() const
 {
 	if (const UWorld* World = GetWorld())
@@ -18,6 +20,7 @@ float UDetectionComponent::GetScanCooldownRemaining() const
 	return 0.f;
 }
 
+// Insta Scan (Q): flags every inbound threat on every active wall. Fast and free, but it can't tell real threats from false positives.
 void UDetectionComponent::PerformScan()
 {
 	AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this));
@@ -32,6 +35,7 @@ void UDetectionComponent::PerformScan()
 		GameMode->PostAlert(FString::Printf(TEXT("Insta Scan recharging (%.0fs)"), CooldownLeft), FColor::Silver);
 		return;
 	}
+	// Start the cooldown as soon as a scan is used.
 	NextScanTime = GetWorld()->GetTimeSeconds() + ScanCooldownSeconds;
 
 	int32 TotalContacts = 0;
@@ -57,6 +61,7 @@ void UDetectionComponent::PerformScan()
 	}
 }
 
+// Validate (F): checks the nearest scanned wall in range. Costs a resource, reveals what each threat really is.
 void UDetectionComponent::PerformValidate()
 {
 	AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this));
@@ -65,7 +70,7 @@ void UDetectionComponent::PerformValidate()
 		return;
 	}
 
-	// Validate the nearest wall that has been scanned and is in range.
+	// Pick the nearest wall that has been scanned and is within ValidateRange.
 	AWallActor* Target = nullptr;
 	float BestDistance = ValidateRange;
 	for (AWallActor* Wall : GameMode->GetWalls())
@@ -95,6 +100,7 @@ void UDetectionComponent::PerformValidate()
 		return;
 	}
 
+	// Pay only after every other check has passed.
 	if (!GameMode->SpendResource(ValidateCost))
 	{
 		GameMode->PostAlert(TEXT("Validate: not enough resources"), FColor::Orange);

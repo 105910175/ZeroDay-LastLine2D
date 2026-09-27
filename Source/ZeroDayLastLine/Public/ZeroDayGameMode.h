@@ -33,15 +33,19 @@ class ZERODAYLASTLINE_API AZeroDayGameMode : public AGameModeBase
 public:
 	AZeroDayGameMode();
 
+	// Which level's rules to apply (1-3). Set per map on the game mode.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay")
 	int32 CurrentLevel = 1;
 
+	// How long the player must hold out to win the level.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay")
 	float LevelDurationSeconds = 90.f;
 
+	// Shared resource pool, spent by Validate and by attending city tasks.
 	UPROPERTY(BlueprintReadOnly, Category = "ZeroDay")
 	int32 Resources = 12;
 
+	// Spends resources if the player has enough. Returns false (and spends nothing) otherwise.
 	UFUNCTION(BlueprintCallable, Category = "ZeroDay")
 	bool SpendResource(int32 Amount = 1);
 
@@ -84,6 +88,7 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	// Turns walls, tasks and spawners on or off to match CurrentLevel.
 	void ConfigureLevel();
 
 	UFUNCTION()
@@ -104,9 +109,11 @@ private:
 	FString EndMessage;
 	bool bPlayerWon = false;
 
+	// Survive-until timer: expiring while the game is still going means a win.
 	UPROPERTY(VisibleAnywhere, Category = "ZeroDay")
 	TObjectPtr<UCooldownComponent> LevelTimer;
 
+	// Everything below is found in the level at BeginPlay.
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AWallActor>> Walls;
 
@@ -116,5 +123,6 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AThreatSpawnerActor>> Spawners;
 
+	// Latched so the game only ends once.
 	bool bGameEnded = false;
 };

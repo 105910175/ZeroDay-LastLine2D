@@ -11,6 +11,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
 
+// Use our character and HUD by default, and create the level timer.
 AZeroDayGameMode::AZeroDayGameMode()
 {
 	DefaultPawnClass = AZeroDayCharacter::StaticClass();
@@ -19,6 +20,7 @@ AZeroDayGameMode::AZeroDayGameMode()
 	LevelTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("LevelTimer"));
 }
 
+// Find everything placed in the level, subscribe to failure events, then configure and start the level.
 void AZeroDayGameMode::BeginPlay()
 {
 	Super::BeginPlay();
@@ -94,6 +96,7 @@ void AZeroDayGameMode::ConfigureLevel()
 	}
 }
 
+// All-or-nothing: never spends part of the cost.
 bool AZeroDayGameMode::SpendResource(int32 Amount)
 {
 	if (Resources < Amount)
@@ -104,6 +107,7 @@ bool AZeroDayGameMode::SpendResource(int32 Amount)
 	return true;
 }
 
+// Queue a message for the HUD, keeping only the most recent few.
 void AZeroDayGameMode::PostAlert(const FString& Message, const FColor& Color)
 {
 	constexpr int32 MaxAlerts = 6;
@@ -121,21 +125,25 @@ void AZeroDayGameMode::PostAlert(const FString& Message, const FColor& Color)
 	}
 }
 
+// Seconds left to survive, for the HUD.
 float AZeroDayGameMode::GetLevelTimeRemaining() const
 {
 	return LevelTimer->GetTimeRemaining();
 }
 
+// Only after a win, and only if a next map has been set.
 bool AZeroDayGameMode::CanLoadNextLevel() const
 {
 	return bGameEnded && bPlayerWon && !NextLevelName.IsNone();
 }
 
+// Restart by reopening the current map.
 void AZeroDayGameMode::ReloadLevel()
 {
 	UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this, true)));
 }
 
+// Opens the next map, if there is one and the level was won.
 void AZeroDayGameMode::LoadNextLevel()
 {
 	if (CanLoadNextLevel())
@@ -144,6 +152,7 @@ void AZeroDayGameMode::LoadNextLevel()
 	}
 }
 
+// Objective shown in the start-of-level banner.
 FString AZeroDayGameMode::GetObjectiveText() const
 {
 	switch (CurrentLevel)
@@ -157,6 +166,7 @@ FString AZeroDayGameMode::GetObjectiveText() const
 	}
 }
 
+// Turns wall status changes into player-facing alerts.
 void AZeroDayGameMode::HandleWallStatusChanged(AWallActor* Wall, EWallStatus NewStatus)
 {
 	if (!Wall || bGameEnded)
@@ -179,21 +189,25 @@ void AZeroDayGameMode::HandleWallStatusChanged(AWallActor* Wall, EWallStatus New
 	}
 }
 
+// A wall stayed breached too long: lose.
 void AZeroDayGameMode::HandleWallLost(AWallActor* LostWall)
 {
 	EndGame(false, FString::Printf(TEXT("The %s wall fell and the zero-day was weaponised."), LostWall ? WallSideToString(LostWall->WallSide) : TEXT("outer")));
 }
 
+// A city task went unattended too long: lose.
 void AZeroDayGameMode::HandleTaskFailed(ACityTaskActor* FailedTask)
 {
 	EndGame(false, FString::Printf(TEXT("%s failed while you were busy elsewhere."), FailedTask ? TaskKindToString(FailedTask->TaskKind) : TEXT("A city task")));
 }
 
+// The level timer ran out with everything still standing: win.
 void AZeroDayGameMode::HandleLevelSurvived()
 {
 	EndGame(true, TEXT("Zero-day contained. The city survives."));
 }
 
+// Stops the timer and spawners and records the result for the HUD.
 void AZeroDayGameMode::EndGame(bool bWon, const FString& Reason)
 {
 	if (bGameEnded)

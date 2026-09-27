@@ -18,21 +18,27 @@ class ZERODAYLASTLINE_API UBreachableComponent : public UActorComponent
 public:
 	UBreachableComponent();
 
+	// Starting and maximum health.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Breachable")
 	float MaxHealth = 100.f;
 
+	// Health fraction (0-1) at or below which the status becomes Threatened.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Breachable")
 	float ThreatenedHealthPercent = 0.5f;
 
+	// Fired only when the status actually changes (Safe / Threatened / Breached).
 	UPROPERTY(BlueprintAssignable, Category = "Breachable")
 	FOnWallStatusChanged OnStatusChanged;
 
+	// Reduces health. Ignored once breached; the wall must be repaired first.
 	UFUNCTION(BlueprintCallable, Category = "Breachable")
 	void ApplyDamage(float Amount);
 
+	// Restores some health and re-evaluates the status.
 	UFUNCTION(BlueprintCallable, Category = "Breachable")
 	void Repair(float Amount);
 
+	// Restores full health. Used when the player fixes a breach.
 	UFUNCTION(BlueprintCallable, Category = "Breachable")
 	void FullyRepair();
 
@@ -46,6 +52,7 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	// Derives Safe/Threatened/Breached from current health and broadcasts on change.
 	void RecalculateStatus();
 
 	UPROPERTY(Transient)

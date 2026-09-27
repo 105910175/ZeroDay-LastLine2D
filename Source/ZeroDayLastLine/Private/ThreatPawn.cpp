@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
+// Threat channel (GameTraceChannel2). Overlaps most things so shots can hit it, but blocks on wall meshes.
 AThreatPawn::AThreatPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -34,6 +35,7 @@ void AThreatPawn::BeginPlay()
 	Super::BeginPlay();
 }
 
+// Tell the wall this threat is gone so scans and validation stay accurate.
 void AThreatPawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (TargetWall)
@@ -43,6 +45,7 @@ void AThreatPawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+// Applies the target, severity and decoy status, and scales stats to match.
 void AThreatPawn::InitialiseThreat(AWallActor* InTargetWall, EThreatSeverity InSeverity, bool bInIsDecoy)
 {
 	TargetWall = InTargetWall;
@@ -66,6 +69,7 @@ void AThreatPawn::InitialiseThreat(AWallActor* InTargetWall, EThreatSeverity InS
 		break;
 	}
 
+	// False positives are harmless: they reach the wall but do no damage.
 	ContactDamage = bIsDecoy ? 0.f : ContactDamage * DamageScale;
 	Health *= HealthScale;
 
@@ -75,6 +79,7 @@ void AThreatPawn::InitialiseThreat(AWallActor* InTargetWall, EThreatSeverity InS
 	}
 }
 
+// Walks in a straight line at the target wall.
 void AThreatPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -85,15 +90,18 @@ void AThreatPawn::Tick(float DeltaTime)
 	}
 
 	const FVector ToTarget = TargetWall->GetActorLocation() - GetActorLocation();
+	// Ignore height so threats stay on the ground plane.
 	const FVector FlatDirection = FVector(ToTarget.X, ToTarget.Y, 0.f).GetSafeNormal();
 
 	if (!FlatDirection.IsNearlyZero())
 	{
+		// Sweep so the threat stops at solid walls instead of passing through.
 		AddActorWorldOffset(FlatDirection * MoveSpeed * DeltaTime, true);
 		SetActorRotation(FlatDirection.Rotation());
 	}
 }
 
+// Called by projectiles. The threat is removed once its health runs out.
 void AThreatPawn::ApplyHitDamage(float Amount)
 {
 	Health -= Amount;
@@ -103,6 +111,7 @@ void AThreatPawn::ApplyHitDamage(float Amount)
 	}
 }
 
+// Damages the wall (0 for false positives) and removes itself.
 void AThreatPawn::OnReachedTargetWall()
 {
 	if (TargetWall)

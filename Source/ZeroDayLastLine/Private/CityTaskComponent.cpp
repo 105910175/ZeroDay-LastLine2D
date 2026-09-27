@@ -12,10 +12,12 @@ void UCityTaskComponent::BeginPlay()
 	bIsCritical = false;
 }
 
+// Decays the condition meter over time.
 void UCityTaskComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	// Fully decayed already; nothing left to lose.
 	if (Condition <= 0.f)
 	{
 		return;
@@ -23,6 +25,7 @@ void UCityTaskComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 
 	Condition = FMath::Clamp(Condition - DecayRatePerSecond * DeltaTime, 0.f, 100.f);
 
+	// Notify once, on the way down, so the owner can start its grace period.
 	if (!bIsCritical && Condition <= CriticalThreshold)
 	{
 		bIsCritical = true;
@@ -30,6 +33,7 @@ void UCityTaskComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	}
 }
 
+// Attending fully restores the task.
 void UCityTaskComponent::Attend()
 {
 	Condition = 100.f;

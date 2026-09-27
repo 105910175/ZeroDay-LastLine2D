@@ -20,15 +20,19 @@ class ZERODAYLASTLINE_API AThreatPawn : public APawn
 public:
 	AThreatPawn();
 
+	// Walking speed in units per second.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat")
 	float MoveSpeed = 150.f;
 
+	// Base health before the severity multiplier is applied.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat")
 	float Health = 30.f;
 
+	// Base damage dealt to the wall on arrival, before the severity multiplier.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat")
 	float ContactDamage = 20.f;
 
+	// The wall this threat is heading for.
 	UPROPERTY(BlueprintReadWrite, Category = "Threat")
 	TObjectPtr<AWallActor> TargetWall;
 
@@ -63,9 +67,11 @@ protected:
 	bool bDetected = false;
 	bool bValidated = false;
 
+	// Collision body: overlaps everything, blocks on walls.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Threat")
 	TObjectPtr<USphereComponent> HitSphere;
 
+	// Visual stand-in only, no collision.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Threat")
 	TObjectPtr<UStaticMeshComponent> BodyMesh;
 };

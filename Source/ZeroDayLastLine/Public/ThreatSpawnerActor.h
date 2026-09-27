@@ -19,15 +19,19 @@ class ZERODAYLASTLINE_API AThreatSpawnerActor : public AActor
 public:
 	AThreatSpawnerActor();
 
+	// Which threat class to spawn.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	TSubclassOf<AThreatPawn> ThreatClass;
 
+	// The wall spawned threats walk towards. Assign this in the level.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	TObjectPtr<AWallActor> TargetWall;
 
+	// Seconds between spawns.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	float SpawnInterval = 4.f;
 
+	// Spawning pauses while this many of its threats are still alive.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	int32 MaxConcurrentThreats = 5;
 
@@ -48,6 +52,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	// Looping countdown that drives spawning.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawner")
 	TObjectPtr<UCooldownComponent> SpawnTimer;
 
@@ -58,5 +63,6 @@ private:
 	UFUNCTION()
 	void HandleSpawnedThreatDestroyed(AActor* DestroyedActor);
 
+	// How many threats from this spawner are currently alive.
 	int32 LiveThreatCount = 0;
 };

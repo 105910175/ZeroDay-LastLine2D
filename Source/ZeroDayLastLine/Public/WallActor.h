@@ -26,18 +26,23 @@ class ZERODAYLASTLINE_API AWallActor : public AActor
 public:
 	AWallActor();
 
+	// Which side of the city this wall guards.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wall")
 	EWallSide WallSide = EWallSide::North;
 
+	// Seconds the player has to fix or clear a breach before the wall is lost.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wall")
 	float RemediationWindowSeconds = 12.f;
 
+	// Set by the game mode: walls not in play this level are hidden and ignored.
 	UPROPERTY(BlueprintReadOnly, Category = "Wall")
 	bool bIsActiveThisLevel = true;
 
+	// Fired if the remediation window expires while still breached (a fail condition).
 	UPROPERTY(BlueprintAssignable, Category = "Wall")
 	FOnWallLost OnWallLost;
 
+	// Fired whenever the wall's status changes; the game mode turns these into alerts.
 	UPROPERTY(BlueprintAssignable, Category = "Wall")
 	FOnWallStatusUpdated OnStatusUpdated;
 
@@ -66,34 +71,42 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Wall")
 	float GetRemediationTimeRemaining() const;
 
+	// Called by a threat when it reaches the wall.
 	UFUNCTION(BlueprintCallable, Category = "Wall")
 	void TakeThreatDamage(float Amount);
 
+	// The player's patch action: fully repairs the wall if it is breached.
 	UFUNCTION(BlueprintCallable, Category = "Wall")
 	void AttemptFix();
 
 	UFUNCTION(BlueprintPure, Category = "Wall")
 	EWallStatus GetStatus() const;
 
+	// Shows/hides the wall and enables/disables its collision for the current level.
 	UFUNCTION(BlueprintCallable, Category = "Wall")
 	void SetActiveThisLevel(bool bActive);
 
 protected:
 	virtual void BeginPlay() override;
 
+	// Visible, solid wall (blocks the player and threats).
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Wall")
 	TObjectPtr<UStaticMeshComponent> WallMesh;
 
+	// Trigger volume that detects threats arriving at the wall.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Wall")
 	TObjectPtr<UBoxComponent> ThreatContactZone;
 
+	// Health and Safe/Threatened/Breached status.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Wall")
 	TObjectPtr<UBreachableComponent> Breachable;
 
+	// Countdown started on breach; expiry means the wall is lost.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Wall")
 	TObjectPtr<UCooldownComponent> RemediationTimer;
 
 private:
+	// Threats currently heading for this wall. Weak pointers so destroyed threats drop out safely.
 	TArray<TWeakObjectPtr<AThreatPawn>> InboundThreats;
 
 	UFUNCTION()

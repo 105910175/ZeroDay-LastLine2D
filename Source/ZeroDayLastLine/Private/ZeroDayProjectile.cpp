@@ -5,6 +5,7 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
+// Removes itself after InitialLifeSpan seconds so missed shots don't pile up.
 AZeroDayProjectile::AZeroDayProjectile()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -37,6 +38,7 @@ AZeroDayProjectile::AZeroDayProjectile()
 	MovementComp->ProjectileGravityScale = 0.f;
 }
 
+// Bind here so the components are ready.
 void AZeroDayProjectile::BeginPlay()
 {
 	Super::BeginPlay();
@@ -45,6 +47,7 @@ void AZeroDayProjectile::BeginPlay()
 	CollisionSphere->OnComponentHit.AddDynamic(this, &AZeroDayProjectile::HandleHit);
 }
 
+// Hitting a threat damages it and consumes the shot.
 void AZeroDayProjectile::HandleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (AThreatPawn* Threat = Cast<AThreatPawn>(OtherActor))
@@ -54,6 +57,7 @@ void AZeroDayProjectile::HandleOverlap(UPrimitiveComponent* OverlappedComponent,
 	}
 }
 
+// Only fires for things the projectile blocks on (static level geometry): stop there.
 void AZeroDayProjectile::HandleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	Destroy();

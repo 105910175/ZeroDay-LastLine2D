@@ -6,6 +6,7 @@
 #include "Components/BoxComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
+// Builds the wall: a solid mesh, a trigger zone for arriving threats, and the shared health and timer components.
 AWallActor::AWallActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -37,6 +38,7 @@ AWallActor::AWallActor()
 	RemediationTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("RemediationTimer"));
 }
 
+// Bind here rather than the constructor so the components are fully initialised.
 void AWallActor::BeginPlay()
 {
 	Super::BeginPlay();
@@ -46,6 +48,7 @@ void AWallActor::BeginPlay()
 	ThreatContactZone->OnComponentBeginOverlap.AddDynamic(this, &AWallActor::HandleThreatContactBegin);
 }
 
+// Damage only counts while the wall is in play this level.
 void AWallActor::TakeThreatDamage(float Amount)
 {
 	if (!bIsActiveThisLevel)
@@ -55,6 +58,7 @@ void AWallActor::TakeThreatDamage(float Amount)
 	Breachable->ApplyDamage(Amount);
 }
 
+// Only a breached wall can be fixed; Safe or Threatened walls are left alone.
 void AWallActor::AttemptFix()
 {
 	if (Breachable->GetStatus() == EWallStatus::Breached)
@@ -63,11 +67,13 @@ void AWallActor::AttemptFix()
 	}
 }
 
+// Convenience passthrough to the Breachable component.
 EWallStatus AWallActor::GetStatus() const
 {
 	return Breachable->GetStatus();
 }
 
+// Inactive walls are hidden and have collision off so they can't be hit or block anything.
 void AWallActor::SetActiveThisLevel(bool bActive)
 {
 	bIsActiveThisLevel = bActive;
@@ -75,26 +81,31 @@ void AWallActor::SetActiveThisLevel(bool bActive)
 	SetActorEnableCollision(bActive);
 }
 
+// Health as a 0-1 fraction, for the HUD.
 float AWallActor::GetHealthPercent() const
 {
 	return Breachable->GetHealthPercent();
 }
 
+// Seconds left to fix a breach (0 when not breached), for the HUD.
 float AWallActor::GetRemediationTimeRemaining() const
 {
 	return RemediationTimer->GetTimeRemaining();
 }
 
+// Threats register themselves so Insta Scan and Validate can find them per wall.
 void AWallActor::RegisterInboundThreat(AThreatPawn* Threat)
 {
 	InboundThreats.AddUnique(Threat);
 }
 
+// Called when a threat is destroyed, whether shot or having hit the wall.
 void AWallActor::UnregisterInboundThreat(AThreatPawn* Threat)
 {
 	InboundThreats.Remove(Threat);
 }
 
+// Counts only threats that are still alive.
 int32 AWallActor::GetInboundThreatCount() const
 {
 	int32 Count = 0;
@@ -108,6 +119,7 @@ int32 AWallActor::GetInboundThreatCount() const
 	return Count;
 }
 
+// How many inbound threats an Insta Scan has flagged.
 int32 AWallActor::GetDetectedThreatCount() const
 {
 	int32 Count = 0;
@@ -121,6 +133,7 @@ int32 AWallActor::GetDetectedThreatCount() const
 	return Count;
 }
 
+// Detected threats that Validate hasn't checked yet.
 int32 AWallActor::GetUnvalidatedDetectedCount() const
 {
 	int32 Count = 0;
@@ -134,6 +147,7 @@ int32 AWallActor::GetUnvalidatedDetectedCount() const
 	return Count;
 }
 
+// Insta Scan: flags everything inbound without revealing what it is.
 int32 AWallActor::MarkInboundDetected()
 {
 	int32 Count = 0;
@@ -148,6 +162,7 @@ int32 AWallActor::MarkInboundDetected()
 	return Count;
 }
 
+// Validate: reveals real vs false positive and tracks the highest real severity.
 void AWallActor::ValidateInbound(int32& OutReal, int32& OutFalsePositives, EThreatSeverity& OutHighestSeverity)
 {
 	OutReal = 0;
@@ -169,6 +184,7 @@ void AWallActor::ValidateInbound(int32& OutReal, int32& OutFalsePositives, EThre
 		else
 		{
 			++OutReal;
+			// Enum order is Low < Medium < Critical, so a numeric compare finds the worst.
 			if (static_cast<uint8>(Threat->Severity) > static_cast<uint8>(OutHighestSeverity))
 			{
 				OutHighestSeverity = Threat->Severity;
@@ -177,6 +193,7 @@ void AWallActor::ValidateInbound(int32& OutReal, int32& OutFalsePositives, EThre
 	}
 }
 
+// Announce every change, then start or stop the breach countdown.
 void AWallActor::HandleStatusChanged(EWallStatus NewStatus)
 {
 	OnStatusUpdated.Broadcast(this, NewStatus);
@@ -191,6 +208,7 @@ void AWallActor::HandleStatusChanged(EWallStatus NewStatus)
 	}
 }
 
+// Time ran out. Only counts as lost if the wall is still breached.
 void AWallActor::HandleRemediationExpired()
 {
 	if (Breachable->GetStatus() == EWallStatus::Breached)
@@ -199,6 +217,7 @@ void AWallActor::HandleRemediationExpired()
 	}
 }
 
+// A threat reached the wall; it applies its own damage and removes itself.
 void AWallActor::HandleThreatContactBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (AThreatPawn* Threat = Cast<AThreatPawn>(OtherActor))

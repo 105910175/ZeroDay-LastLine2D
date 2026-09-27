@@ -17,21 +17,26 @@ class ZERODAYLASTLINE_API AZeroDayProjectile : public AActor
 public:
 	AZeroDayProjectile();
 
+	// Damage dealt to a threat on hit.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Projectile")
 	float Damage = 15.f;
 
+	// Travel speed in units per second.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Projectile")
 	float Speed = 3000.f;
 
 protected:
 	virtual void BeginPlay() override;
 
+	// Projectile channel (GameTraceChannel3): overlaps threats, blocks on static level geometry.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projectile")
 	TObjectPtr<USphereComponent> CollisionSphere;
 
+	// Visual only, no collision.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projectile")
 	TObjectPtr<UStaticMeshComponent> ProjectileMesh;
 
+	// Flies in a straight line with no gravity.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projectile")
 	TObjectPtr<UProjectileMovementComponent> MovementComp;
 
