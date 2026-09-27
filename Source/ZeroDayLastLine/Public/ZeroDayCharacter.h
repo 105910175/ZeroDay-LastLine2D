@@ -25,6 +25,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Combat")
 	float InteractRange = 250.f;
 
+	// World directions the W/S and D/A keys move along. Defaults match the level's
+	// orientation; change these if the camera or map is rotated.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Movement")
+	FVector ForwardInputDirection = FVector(0.f, 1.f, 0.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Movement")
+	FVector RightInputDirection = FVector(-1.f, 0.f, 0.f);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

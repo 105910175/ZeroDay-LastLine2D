@@ -9,6 +9,9 @@ AThreatSpawnerActor::AThreatSpawnerActor()
 	PrimaryActorTick.bCanEverTick = false;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
+	// Default to the shipped threat so a placed spawner works without Blueprint setup.
+	ThreatClass = AThreatPawn::StaticClass();
+
 	SpawnTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("SpawnTimer"));
 }
 

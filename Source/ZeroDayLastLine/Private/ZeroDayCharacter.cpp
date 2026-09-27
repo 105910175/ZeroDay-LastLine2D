@@ -16,6 +16,9 @@ AZeroDayCharacter::AZeroDayCharacter()
 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	// Default to the shipped projectile so firing works without Blueprint setup.
+	ProjectileClass = AZeroDayProjectile::StaticClass();
+
 	bUseControllerRotationYaw = false;
 
 	GetCharacterMovement()->bOrientRotationToMovement = true;
@@ -68,28 +71,35 @@ void AZeroDayCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 void AZeroDayCharacter::MoveForward(float Value)
 {
-    if (Value != 0.f)
-    {
-        AddMovementInput(FVector::RightVector, Value);
-    }
+	if (Value != 0.f)
+	{
+		AddMovementInput(ForwardInputDirection, Value);
+	}
 }
 
 void AZeroDayCharacter::MoveRight(float Value)
 {
-    if (Value != 0.f)
-    {
-        AddMovementInput(FVector::ForwardVector, -Value);
-    }
+	if (Value != 0.f)
+	{
+		AddMovementInput(RightInputDirection, Value);
+	}
 }
 
 FVector AZeroDayCharacter::GetGroundAimPoint() const
 {
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
-		FHitResult Hit;
-		if (PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
+		FVector RayOrigin;
+		FVector RayDirection;
+		if (PC->DeprojectMousePositionToWorld(RayOrigin, RayDirection) && !FMath::IsNearlyZero(RayDirection.Z))
 		{
-			return Hit.Location;
+			// Intersect the cursor ray with the horizontal plane at the player's height.
+			// The 2D sprite map has no collision, so a line trace would never hit it.
+			const float DistanceAlongRay = (GetActorLocation().Z - RayOrigin.Z) / RayDirection.Z;
+			if (DistanceAlongRay > 0.f)
+			{
+				return RayOrigin + RayDirection * DistanceAlongRay;
+			}
 		}
 	}
 	return GetActorLocation() + GetActorForwardVector() * 500.f;
