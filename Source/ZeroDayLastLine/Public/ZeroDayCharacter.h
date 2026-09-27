@@ -61,6 +61,8 @@ private:
 	void MoveRight(float Value);
 	void Fire();
 	void Interact();
+	void RestartLevel();
+	void NextLevel();
 
 	FVector GetGroundAimPoint() const;
 };

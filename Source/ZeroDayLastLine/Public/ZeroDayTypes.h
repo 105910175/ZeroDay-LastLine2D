@@ -47,6 +47,16 @@ inline const TCHAR* WallSideToString(EWallSide Side)
 	}
 }
 
+inline const TCHAR* TaskKindToString(ECityTaskKind Kind)
+{
+	switch (Kind)
+	{
+	case ECityTaskKind::Power: return TEXT("Power");
+	case ECityTaskKind::Food: return TEXT("Food");
+	default: return TEXT("Medical");
+	}
+}
+
 inline const TCHAR* SeverityToString(EThreatSeverity Severity)
 {
 	switch (Severity)

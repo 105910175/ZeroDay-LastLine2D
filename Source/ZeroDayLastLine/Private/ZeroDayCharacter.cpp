@@ -5,6 +5,7 @@
 #include "WallActor.h"
 #include "CityTaskActor.h"
 #include "DetectionComponent.h"
+#include "ZeroDayGameMode.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -72,6 +73,8 @@ void AZeroDayCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AZeroDayCharacter::Interact);
 	PlayerInputComponent->BindAction("Scan", IE_Pressed, Detection.Get(), &UDetectionComponent::PerformScan);
 	PlayerInputComponent->BindAction("Validate", IE_Pressed, Detection.Get(), &UDetectionComponent::PerformValidate);
+	PlayerInputComponent->BindAction("Restart", IE_Pressed, this, &AZeroDayCharacter::RestartLevel);
+	PlayerInputComponent->BindAction("NextLevel", IE_Pressed, this, &AZeroDayCharacter::NextLevel);
 }
 
 void AZeroDayCharacter::MoveForward(float Value)
@@ -155,5 +158,21 @@ void AZeroDayCharacter::Interact()
 			Task->Attend();
 			return;
 		}
+	}
+}
+
+void AZeroDayCharacter::RestartLevel()
+{
+	if (AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		GameMode->ReloadLevel();
+	}
+}
+
+void AZeroDayCharacter::NextLevel()
+{
+	if (AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		GameMode->LoadNextLevel();
 	}
 }

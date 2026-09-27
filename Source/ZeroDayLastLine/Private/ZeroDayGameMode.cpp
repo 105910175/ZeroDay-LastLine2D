@@ -7,12 +7,14 @@
 #include "CooldownComponent.h"
 #include "ZeroDayTypes.h"
 #include "ZeroDayCharacter.h"
+#include "ZeroDayHUD.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Engine.h"
 
 AZeroDayGameMode::AZeroDayGameMode()
 {
 	DefaultPawnClass = AZeroDayCharacter::StaticClass();
+	HUDClass = AZeroDayHUD::StaticClass();
 
 	LevelTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("LevelTimer"));
 }
@@ -104,9 +106,54 @@ bool AZeroDayGameMode::SpendResource(int32 Amount)
 
 void AZeroDayGameMode::PostAlert(const FString& Message, const FColor& Color)
 {
-	if (GEngine)
+	constexpr int32 MaxAlerts = 6;
+	constexpr float AlertLifetimeSeconds = 6.f;
+
+	FZeroDayAlert Alert;
+	Alert.Message = Message;
+	Alert.Color = Color;
+	Alert.ExpireTime = GetWorld()->GetTimeSeconds() + AlertLifetimeSeconds;
+	Alerts.Add(Alert);
+
+	if (Alerts.Num() > MaxAlerts)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, Color, Message);
+		Alerts.RemoveAt(0);
+	}
+}
+
+float AZeroDayGameMode::GetLevelTimeRemaining() const
+{
+	return LevelTimer->GetTimeRemaining();
+}
+
+bool AZeroDayGameMode::CanLoadNextLevel() const
+{
+	return bGameEnded && bPlayerWon && !NextLevelName.IsNone();
+}
+
+void AZeroDayGameMode::ReloadLevel()
+{
+	UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this, true)));
+}
+
+void AZeroDayGameMode::LoadNextLevel()
+{
+	if (CanLoadNextLevel())
+	{
+		UGameplayStatics::OpenLevel(this, NextLevelName);
+	}
+}
+
+FString AZeroDayGameMode::GetObjectiveText() const
+{
+	switch (CurrentLevel)
+	{
+	case 1:
+		return TEXT("Hold the north wall until the timer runs out. Scan (Q), validate (F), then shoot real threats.");
+	case 2:
+		return TEXT("Defend all four walls. Threats come from every side, so decide which exposure matters most.");
+	default:
+		return TEXT("Defend every wall and keep power, food and medical care running (E at each station).");
 	}
 }
 
@@ -134,26 +181,28 @@ void AZeroDayGameMode::HandleWallStatusChanged(AWallActor* Wall, EWallStatus New
 
 void AZeroDayGameMode::HandleWallLost(AWallActor* LostWall)
 {
-	EndGame(false);
+	EndGame(false, FString::Printf(TEXT("The %s wall fell and the zero-day was weaponised."), LostWall ? WallSideToString(LostWall->WallSide) : TEXT("outer")));
 }
 
 void AZeroDayGameMode::HandleTaskFailed(ACityTaskActor* FailedTask)
 {
-	EndGame(false);
+	EndGame(false, FString::Printf(TEXT("%s failed while you were busy elsewhere."), FailedTask ? TaskKindToString(FailedTask->TaskKind) : TEXT("A city task")));
 }
 
 void AZeroDayGameMode::HandleLevelSurvived()
 {
-	EndGame(true);
+	EndGame(true, TEXT("Zero-day contained. The city survives."));
 }
 
-void AZeroDayGameMode::EndGame(bool bWon)
+void AZeroDayGameMode::EndGame(bool bWon, const FString& Reason)
 {
 	if (bGameEnded)
 	{
 		return;
 	}
 	bGameEnded = true;
+	bPlayerWon = bWon;
+	EndMessage = Reason;
 
 	LevelTimer->CancelCooldown();
 	for (AThreatSpawnerActor* Spawner : Spawners)
@@ -162,11 +211,5 @@ void AZeroDayGameMode::EndGame(bool bWon)
 		{
 			Spawner->SetSpawningEnabled(false);
 		}
-	}
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 6.f, bWon ? FColor::Green : FColor::Red,
-			bWon ? TEXT("Zero-day contained. City survives.") : TEXT("A wall has fallen. Zero-day weaponised."));
 	}
 }
