@@ -75,8 +75,112 @@ void AWallActor::SetActiveThisLevel(bool bActive)
 	SetActorEnableCollision(bActive);
 }
 
+float AWallActor::GetHealthPercent() const
+{
+	return Breachable->GetHealthPercent();
+}
+
+float AWallActor::GetRemediationTimeRemaining() const
+{
+	return RemediationTimer->GetTimeRemaining();
+}
+
+void AWallActor::RegisterInboundThreat(AThreatPawn* Threat)
+{
+	InboundThreats.AddUnique(Threat);
+}
+
+void AWallActor::UnregisterInboundThreat(AThreatPawn* Threat)
+{
+	InboundThreats.Remove(Threat);
+}
+
+int32 AWallActor::GetInboundThreatCount() const
+{
+	int32 Count = 0;
+	for (const TWeakObjectPtr<AThreatPawn>& Threat : InboundThreats)
+	{
+		if (Threat.IsValid())
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+int32 AWallActor::GetDetectedThreatCount() const
+{
+	int32 Count = 0;
+	for (const TWeakObjectPtr<AThreatPawn>& Threat : InboundThreats)
+	{
+		if (Threat.IsValid() && Threat->IsDetected())
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+int32 AWallActor::GetUnvalidatedDetectedCount() const
+{
+	int32 Count = 0;
+	for (const TWeakObjectPtr<AThreatPawn>& Threat : InboundThreats)
+	{
+		if (Threat.IsValid() && Threat->IsDetected() && !Threat->IsValidated())
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+int32 AWallActor::MarkInboundDetected()
+{
+	int32 Count = 0;
+	for (const TWeakObjectPtr<AThreatPawn>& Threat : InboundThreats)
+	{
+		if (Threat.IsValid())
+		{
+			Threat->MarkDetected();
+			++Count;
+		}
+	}
+	return Count;
+}
+
+void AWallActor::ValidateInbound(int32& OutReal, int32& OutFalsePositives, EThreatSeverity& OutHighestSeverity)
+{
+	OutReal = 0;
+	OutFalsePositives = 0;
+	OutHighestSeverity = EThreatSeverity::Low;
+
+	for (const TWeakObjectPtr<AThreatPawn>& Threat : InboundThreats)
+	{
+		if (!Threat.IsValid() || !Threat->IsDetected())
+		{
+			continue;
+		}
+
+		Threat->MarkValidated();
+		if (Threat->bIsDecoy)
+		{
+			++OutFalsePositives;
+		}
+		else
+		{
+			++OutReal;
+			if (static_cast<uint8>(Threat->Severity) > static_cast<uint8>(OutHighestSeverity))
+			{
+				OutHighestSeverity = Threat->Severity;
+			}
+		}
+	}
+}
+
 void AWallActor::HandleStatusChanged(EWallStatus NewStatus)
 {
+	OnStatusUpdated.Broadcast(this, NewStatus);
+
 	if (NewStatus == EWallStatus::Breached)
 	{
 		RemediationTimer->StartCooldown(RemediationWindowSeconds, false);

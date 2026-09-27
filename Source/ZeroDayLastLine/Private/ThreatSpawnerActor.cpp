@@ -53,7 +53,18 @@ void AThreatSpawnerActor::HandleSpawnTick()
 	AThreatPawn* NewThreat = GetWorld()->SpawnActor<AThreatPawn>(ThreatClass, GetActorLocation(), GetActorRotation(), SpawnParams);
 	if (NewThreat)
 	{
-		NewThreat->TargetWall = TargetWall;
+		const float SeverityRoll = FMath::FRand();
+		EThreatSeverity Severity = EThreatSeverity::Low;
+		if (SeverityRoll < CriticalChance)
+		{
+			Severity = EThreatSeverity::Critical;
+		}
+		else if (SeverityRoll < CriticalChance + MediumChance)
+		{
+			Severity = EThreatSeverity::Medium;
+		}
+
+		NewThreat->InitialiseThreat(TargetWall, Severity, FMath::FRand() < DecoyChance);
 		NewThreat->OnDestroyed.AddDynamic(this, &AThreatSpawnerActor::HandleSpawnedThreatDestroyed);
 		LiveThreatCount++;
 	}

@@ -10,8 +10,10 @@ class UCooldownComponent;
 class UStaticMeshComponent;
 class UBoxComponent;
 class AWallActor;
+class AThreatPawn;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWallLost, AWallActor*, LostWall);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWallStatusUpdated, AWallActor*, Wall, EWallStatus, NewStatus);
 
 // One of the four city walls. Detect = Breachable's Threatened/Breached status.
 // Remediate = AttemptFix() (patch) or simply surviving the RemediationTimer window
@@ -35,6 +37,34 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Wall")
 	FOnWallLost OnWallLost;
+
+	UPROPERTY(BlueprintAssignable, Category = "Wall")
+	FOnWallStatusUpdated OnStatusUpdated;
+
+	// Threats currently walking towards this wall. Threats register themselves when
+	// initialised and unregister when destroyed.
+	void RegisterInboundThreat(AThreatPawn* Threat);
+	void UnregisterInboundThreat(AThreatPawn* Threat);
+
+	int32 GetInboundThreatCount() const;
+
+	// Number of inbound threats an Insta Scan has flagged / that Validate hasn't checked yet.
+	int32 GetDetectedThreatCount() const;
+	int32 GetUnvalidatedDetectedCount() const;
+	bool IsExposureDetected() const { return GetDetectedThreatCount() > 0; }
+
+	// Insta Scan: flags every inbound threat as detected. Returns how many there are.
+	int32 MarkInboundDetected();
+
+	// Validate: reveals whether each detected threat is real or a false positive.
+	void ValidateInbound(int32& OutReal, int32& OutFalsePositives, EThreatSeverity& OutHighestSeverity);
+
+	UFUNCTION(BlueprintPure, Category = "Wall")
+	float GetHealthPercent() const;
+
+	// Seconds left to remediate a breach (0 when not breached).
+	UFUNCTION(BlueprintPure, Category = "Wall")
+	float GetRemediationTimeRemaining() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Wall")
 	void TakeThreatDamage(float Amount);
@@ -64,6 +94,8 @@ protected:
 	TObjectPtr<UCooldownComponent> RemediationTimer;
 
 private:
+	TArray<TWeakObjectPtr<AThreatPawn>> InboundThreats;
+
 	UFUNCTION()
 	void HandleStatusChanged(EWallStatus NewStatus);
 

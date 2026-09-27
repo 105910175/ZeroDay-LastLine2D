@@ -34,6 +34,47 @@ void AThreatPawn::BeginPlay()
 	Super::BeginPlay();
 }
 
+void AThreatPawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (TargetWall)
+	{
+		TargetWall->UnregisterInboundThreat(this);
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void AThreatPawn::InitialiseThreat(AWallActor* InTargetWall, EThreatSeverity InSeverity, bool bInIsDecoy)
+{
+	TargetWall = InTargetWall;
+	Severity = InSeverity;
+	bIsDecoy = bInIsDecoy;
+
+	// Relative to the base ContactDamage/Health set on the class.
+	float DamageScale = 1.f;
+	float HealthScale = 1.f;
+	switch (Severity)
+	{
+	case EThreatSeverity::Low:
+		DamageScale = 0.5f;
+		HealthScale = 0.7f;
+		break;
+	case EThreatSeverity::Critical:
+		DamageScale = 2.f;
+		HealthScale = 2.f;
+		break;
+	default:
+		break;
+	}
+
+	ContactDamage = bIsDecoy ? 0.f : ContactDamage * DamageScale;
+	Health *= HealthScale;
+
+	if (TargetWall)
+	{
+		TargetWall->RegisterInboundThreat(this);
+	}
+}
+
 void AThreatPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);

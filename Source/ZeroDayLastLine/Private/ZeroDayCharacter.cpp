@@ -4,6 +4,7 @@
 #include "ZeroDayProjectile.h"
 #include "WallActor.h"
 #include "CityTaskActor.h"
+#include "DetectionComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -34,6 +35,8 @@ AZeroDayCharacter::AZeroDayCharacter()
 	TopDownCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("TopDownCamera"));
 	TopDownCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	TopDownCamera->bUsePawnControlRotation = false;
+
+	Detection = CreateDefaultSubobject<UDetectionComponent>(TEXT("Detection"));
 }
 
 // Called when the game starts or when spawned
@@ -67,6 +70,8 @@ void AZeroDayCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAxis("MoveRight", this, &AZeroDayCharacter::MoveRight);
 	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AZeroDayCharacter::Fire);
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AZeroDayCharacter::Interact);
+	PlayerInputComponent->BindAction("Scan", IE_Pressed, Detection.Get(), &UDetectionComponent::PerformScan);
+	PlayerInputComponent->BindAction("Validate", IE_Pressed, Detection.Get(), &UDetectionComponent::PerformValidate);
 }
 
 void AZeroDayCharacter::MoveForward(float Value)

@@ -9,6 +9,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class AZeroDayProjectile;
+class UDetectionComponent;
 
 UCLASS()
 class ZERODAYLASTLINE_API AZeroDayCharacter : public ACharacter
@@ -50,6 +51,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Camera")
 	TObjectPtr<UCameraComponent> TopDownCamera;
+
+	// Insta Scan (Q) and Validate (F).
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Detection")
+	TObjectPtr<UDetectionComponent> Detection;
 
 private:
 	void MoveForward(float Value);

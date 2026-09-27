@@ -29,6 +29,7 @@ void AZeroDayGameMode::BeginPlay()
 		{
 			Walls.Add(Wall);
 			Wall->OnWallLost.AddDynamic(this, &AZeroDayGameMode::HandleWallLost);
+			Wall->OnStatusUpdated.AddDynamic(this, &AZeroDayGameMode::HandleWallStatusChanged);
 		}
 	}
 
@@ -99,6 +100,36 @@ bool AZeroDayGameMode::SpendResource(int32 Amount)
 	}
 	Resources -= Amount;
 	return true;
+}
+
+void AZeroDayGameMode::PostAlert(const FString& Message, const FColor& Color)
+{
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, Color, Message);
+	}
+}
+
+void AZeroDayGameMode::HandleWallStatusChanged(AWallActor* Wall, EWallStatus NewStatus)
+{
+	if (!Wall || bGameEnded)
+	{
+		return;
+	}
+
+	const TCHAR* Side = WallSideToString(Wall->WallSide);
+	switch (NewStatus)
+	{
+	case EWallStatus::Threatened:
+		PostAlert(FString::Printf(TEXT("%s wall under attack (integrity %.0f%%)"), Side, Wall->GetHealthPercent() * 100.f), FColor::Orange);
+		break;
+	case EWallStatus::Breached:
+		PostAlert(FString::Printf(TEXT("%s wall BREACHED: fix it (E) or clear the threats!"), Side), FColor::Red);
+		break;
+	default:
+		PostAlert(FString::Printf(TEXT("%s wall secured"), Side), FColor::Green);
+		break;
+	}
 }
 
 void AZeroDayGameMode::HandleWallLost(AWallActor* LostWall)

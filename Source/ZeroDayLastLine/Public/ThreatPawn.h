@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "ZeroDayTypes.h"
 #include "ThreatPawn.generated.h"
 
 class AWallActor;
@@ -31,6 +32,23 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Threat")
 	TObjectPtr<AWallActor> TargetWall;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Threat")
+	EThreatSeverity Severity = EThreatSeverity::Medium;
+
+	// A false positive: looks like an exposure but is not exploitable, so it does no damage.
+	UPROPERTY(BlueprintReadOnly, Category = "Threat")
+	bool bIsDecoy = false;
+
+	// Called by the spawner right after spawning. Assigns the target, rolls severity
+	// and decoy status, and scales stats to match.
+	void InitialiseThreat(AWallActor* InTargetWall, EThreatSeverity InSeverity, bool bInIsDecoy);
+
+	// Insta Scan flags a threat as detected; Validate then reveals what it really is.
+	void MarkDetected() { bDetected = true; }
+	void MarkValidated() { bValidated = true; }
+	bool IsDetected() const { return bDetected; }
+	bool IsValidated() const { return bValidated; }
+
 	UFUNCTION(BlueprintCallable, Category = "Threat")
 	void ApplyHitDamage(float Amount);
 
@@ -39,7 +57,11 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaTime) override;
+
+	bool bDetected = false;
+	bool bValidated = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Threat")
 	TObjectPtr<USphereComponent> HitSphere;

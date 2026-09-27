@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "ZeroDayTypes.h"
 #include "ZeroDayGameMode.generated.h"
 
 class AWallActor;
@@ -39,6 +40,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "ZeroDay")
 	bool IsGameOver() const { return bGameEnded; }
 
+	// Shows a short status message to the player (scan results, wall warnings, etc.).
+	void PostAlert(const FString& Message, const FColor& Color = FColor::Yellow);
+
+	const TArray<TObjectPtr<AWallActor>>& GetWalls() const { return Walls; }
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -47,6 +53,9 @@ private:
 
 	UFUNCTION()
 	void HandleWallLost(AWallActor* LostWall);
+
+	UFUNCTION()
+	void HandleWallStatusChanged(AWallActor* Wall, EWallStatus NewStatus);
 
 	UFUNCTION()
 	void HandleTaskFailed(ACityTaskActor* FailedTask);

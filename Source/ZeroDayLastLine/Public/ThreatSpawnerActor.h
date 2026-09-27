@@ -31,6 +31,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	int32 MaxConcurrentThreats = 5;
 
+	// Chance (0-1) that a spawned threat is a harmless false positive.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner", meta = (ClampMin = "0", ClampMax = "1"))
+	float DecoyChance = 0.25f;
+
+	// Chance (0-1) of a Critical / Medium threat. Whatever is left over is Low.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner", meta = (ClampMin = "0", ClampMax = "1"))
+	float CriticalChance = 0.15f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner", meta = (ClampMin = "0", ClampMax = "1"))
+	float MediumChance = 0.35f;
+
 	UFUNCTION(BlueprintCallable, Category = "Spawner")
 	void SetSpawningEnabled(bool bEnabled);
 
