@@ -3,41 +3,70 @@
 #include "CooldownComponent.h" // Breach countdown timer.
 #include "ThreatPawn.h" // So we can talk to arriving threats.
 #include "ZeroDayGameMode.h" // Where Patch kits are spent and stats are kept.
+#include "ZeroDayPhysics.h" // The wall's physics material.
+#include "ZeroDaySprites.h" // Helper that lays sprites flat.
+#include "PaperSprite.h" // The wall artwork asset type.
+#include "PaperSpriteComponent.h" // Draws one tile of artwork.
 #include "Kismet/GameplayStatics.h" // Lets us fetch the current game mode.
+#include "Components/SceneComponent.h" // The invisible root.
 #include "Components/StaticMeshComponent.h" // The wall body.
 #include "Components/BoxComponent.h" // The threat trigger volume.
-#include "UObject/ConstructorHelpers.h" // Lets a constructor load engine assets.
+#include "UObject/ConstructorHelpers.h" // Lets a constructor load engine and content assets.
 
-// Builds the wall: a solid mesh, a trigger zone for arriving threats, and the shared health and timer components.
+namespace // Only this file uses these.
+{
+	constexpr float TileArtWidth = 256.f; // Each artwork tile is 256 pixels (= units) wide.
+	constexpr float WallBodyHeight = 60.f; // How tall the invisible collision body is.
+	constexpr float WallBodyDepth = 50.f; // How thick the invisible collision body is.
+	constexpr float ContactZoneHalfDepth = 120.f; // How far in front of/behind the wall a threat counts as arriving.
+}
+
+// Builds the wall: a solid body, a trigger zone for arriving threats, the artwork and the shared components.
 AWallActor::AWallActor()
 {
 	PrimaryActorTick.bCanEverTick = false; // The wall reacts to events, so it never needs a per-frame tick.
 
-	WallMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WallMesh")); // Create the visible, solid body.
-	RootComponent = WallMesh; // Make the mesh the actor's root so everything else attaches to it.
+	WallRoot = CreateDefaultSubobject<USceneComponent>(TEXT("WallRoot")); // An invisible root with no scale of its own.
+	RootComponent = WallRoot; // Everything else attaches to it.
 
-	// Blockout mesh so the wall is visible before real art exists: a 100 unit engine cube stretched into a low rampart.
+	WallMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WallMesh")); // Create the solid body.
+	WallMesh->SetupAttachment(WallRoot); // Attach it to the root.
+
+	// Blockout mesh: a 100 unit engine cube stretched into a low rampart. It is what blocks movement,
+	// and it is what you see if the artwork is missing.
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube")); // Find the engine cube once.
 	if (CubeMeshAsset.Succeeded()) // Only use it if the engine asset was found.
 	{
 		WallMesh->SetStaticMesh(CubeMeshAsset.Object); // Show the cube.
 	}
-	WallMesh->SetRelativeScale3D(FVector(3.0f, 0.5f, 0.6f)); // 300 long, 50 deep, 60 tall: low enough not to hide the map behind it.
+	WallMesh->SetRelativeScale3D(FVector(WallLength / 100.f, WallBodyDepth / 100.f, WallBodyHeight / 100.f)); // Long, thin and low.
 
 	WallMesh->SetCollisionObjectType(ECC_GameTraceChannel1); // Wall channel (GameTraceChannel1).
 	WallMesh->SetCollisionResponseToAllChannels(ECR_Block); // Block everything by default...
 	WallMesh->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Overlap); // ...but let projectiles pass so the player can shoot threats approaching from outside.
 
 	ThreatContactZone = CreateDefaultSubobject<UBoxComponent>(TEXT("ThreatContactZone")); // Trigger volume around the wall.
-	ThreatContactZone->SetupAttachment(RootComponent); // Attach it to the wall so it moves with it.
-	// The zone inherits the mesh's 3 x 0.5 x 0.6 scale, so divide to get roughly 170 x 120 x 120 world half-extents.
-	ThreatContactZone->SetBoxExtent(FVector(57.f, 240.f, 200.f)); // Slightly longer and deeper than the wall itself.
+	ThreatContactZone->SetupAttachment(WallRoot); // Attach it to the root (so the mesh scale does not stretch it).
+	ThreatContactZone->SetBoxExtent(FVector(WallLength * 0.5f + 20.f, ContactZoneHalfDepth, 120.f)); // A little longer than the wall and deeper than its body.
 	ThreatContactZone->SetCollisionObjectType(ECC_GameTraceChannel1); // Reports as the Wall channel.
 	ThreatContactZone->SetCollisionResponseToAllChannels(ECR_Ignore); // Ignore everything...
 	ThreatContactZone->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Overlap); // ...except threats, which should trigger it.
 
 	Breachable = CreateDefaultSubobject<UBreachableComponent>(TEXT("Breachable")); // Health and status tracking.
 	RemediationTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("RemediationTimer")); // Countdown used after a breach.
+
+	// The wall artwork for each condition. If any is missing the blockout mesh is shown instead.
+	static ConstructorHelpers::FObjectFinder<UPaperSprite> IntactFinder(TEXT("/Game/Sprites/S_wall_intact.S_wall_intact")); // Healthy wall.
+	static ConstructorHelpers::FObjectFinder<UPaperSprite> DamagedFinder(TEXT("/Game/Sprites/S_wall_damaged.S_wall_damaged")); // Cracked wall.
+	static ConstructorHelpers::FObjectFinder<UPaperSprite> BreachedFinder(TEXT("/Game/Sprites/S_wall_breached.S_wall_breached")); // Broken wall.
+	if (IntactFinder.Succeeded() && DamagedFinder.Succeeded() && BreachedFinder.Succeeded()) // All three artworks exist.
+	{
+		IntactSprite = IntactFinder.Object; // Remember them.
+		DamagedSprite = DamagedFinder.Object;
+		BreachedSprite = BreachedFinder.Object;
+		bHasSprites = true; // We will draw sprite tiles.
+		WallMesh->SetVisibility(false); // Hide the blockout body but keep its collision.
+	}
 }
 
 // Bind here rather than the constructor so the components are fully initialised.
@@ -48,6 +77,69 @@ void AWallActor::BeginPlay()
 	Breachable->OnStatusChanged.AddDynamic(this, &AWallActor::HandleStatusChanged); // Tell us when health changes the status.
 	RemediationTimer->OnExpired.AddDynamic(this, &AWallActor::HandleRemediationExpired); // Tell us when the breach countdown ends.
 	ThreatContactZone->OnComponentBeginOverlap.AddDynamic(this, &AWallActor::HandleThreatContactBegin); // Tell us when something arrives.
+
+	WallMesh->SetPhysMaterialOverride(ZeroDayPhysics::Get(EZeroDayMaterial::Wall)); // Rough stone: pickups thrown at it barely bounce.
+	SetWallLength(WallLength); // Size the body and zone for the configured length (also builds the artwork).
+}
+
+// Resizes the body, the trigger zone and the artwork to a new length.
+void AWallActor::SetWallLength(float NewLength)
+{
+	WallLength = FMath::Max(50.f, NewLength); // Never shorter than 50 units.
+	WallMesh->SetRelativeScale3D(FVector(WallLength / 100.f, WallBodyDepth / 100.f, WallBodyHeight / 100.f)); // Stretch the body (the cube is 100 units).
+	ThreatContactZone->SetBoxExtent(FVector(WallLength * 0.5f + 20.f, ContactZoneHalfDepth, 120.f)); // Keep the trigger zone matched.
+	RebuildVisuals(); // Redraw the artwork at the new length.
+}
+
+// Replaces the row of artwork tiles so it exactly covers the wall's length.
+void AWallActor::RebuildVisuals()
+{
+	for (UPaperSpriteComponent* Tile : SpriteTiles) // Remove the old tiles.
+	{
+		if (Tile) // Skip any that are already gone.
+		{
+			Tile->DestroyComponent(); // Delete it.
+		}
+	}
+	SpriteTiles.Empty(); // Forget them.
+
+	if (!bHasSprites) // No artwork available.
+	{
+		return; // The blockout mesh is visible instead.
+	}
+
+	const int32 TileCount = FMath::Max(1, FMath::RoundToInt(WallLength / TileArtWidth)); // How many tiles fit.
+	const float TileLength = WallLength / TileCount; // Stretch each slightly so the row ends exactly at the wall's ends.
+	for (int32 Index = 0; Index < TileCount; ++Index) // Create each tile.
+	{
+		UPaperSpriteComponent* Tile = NewObject<UPaperSpriteComponent>(this); // A new sprite component owned by this wall.
+		Tile->SetupAttachment(WallRoot); // Attach it to the root.
+		Tile->RegisterComponent(); // Make it live in the world.
+		ZeroDaySprites::ConfigureFlat(Tile, IntactSprite, ZeroDaySprites::HeadingRotation(), 6.f); // Lay it flat with the wall's long axis as the art's width.
+		Tile->SetRelativeLocation(FVector(-WallLength * 0.5f + (Index + 0.5f) * TileLength, 0.f, 6.f)); // Place it along the wall.
+		Tile->SetRelativeScale3D(FVector(TileLength / TileArtWidth, 1.f, 1.f)); // Stretch it to fit its share of the length.
+		SpriteTiles.Add(Tile); // Keep track of it.
+	}
+	UpdateVisuals(); // Show the artwork that matches the current condition.
+}
+
+// Switches every tile to the artwork for the wall's current condition.
+void AWallActor::UpdateVisuals()
+{
+	UPaperSprite* Wanted = IntactSprite; // Default to the healthy artwork.
+	switch (Breachable->GetStatus()) // Choose by condition.
+	{
+	case EWallStatus::Threatened: Wanted = DamagedSprite; break; // Cracked.
+	case EWallStatus::Breached: Wanted = BreachedSprite; break; // Broken.
+	default: break; // Safe keeps the healthy artwork.
+	}
+	for (UPaperSpriteComponent* Tile : SpriteTiles) // Update each tile.
+	{
+		if (Tile) // Skip any that are gone.
+		{
+			Tile->SetSprite(Wanted); // Swap the picture.
+		}
+	}
 }
 
 // Damage only counts while the wall is in play this level.
@@ -93,7 +185,7 @@ EWallStatus AWallActor::GetStatus() const
 void AWallActor::SetActiveThisLevel(bool bActive)
 {
 	bIsActiveThisLevel = bActive; // Remember the state for other systems to check.
-	SetActorHiddenInGame(!bActive); // Hide the wall when it is not in play.
+	SetActorHiddenInGame(!bActive); // Hide the wall (and its artwork) when it is not in play.
 	SetActorEnableCollision(bActive); // Turn its collision off when it is not in play.
 }
 
@@ -121,6 +213,7 @@ void AWallActor::ResetForLevel()
 	InboundThreats.Empty(); // Forget threats from the previous run.
 	RemediationTimer->CancelCooldown(); // A breach countdown must not carry over.
 	Breachable->FullyRepair(); // Full health again (status returns to Safe).
+	UpdateVisuals(); // Make sure the artwork shows the healthy wall.
 }
 
 // Threats register themselves so Insta Scan and Validate can find them per wall.
@@ -222,9 +315,10 @@ void AWallActor::ValidateInbound(int32& OutReal, int32& OutFalsePositives, EThre
 	}
 }
 
-// Announce every change, then start or stop the breach countdown.
+// Announce every change, swap the artwork, then start or stop the breach countdown.
 void AWallActor::HandleStatusChanged(EWallStatus NewStatus)
 {
+	UpdateVisuals(); // Show intact, cracked or broken artwork.
 	OnStatusUpdated.Broadcast(this, NewStatus); // Let the game mode raise an alert.
 
 	if (NewStatus == EWallStatus::Breached) // A breach starts the clock...

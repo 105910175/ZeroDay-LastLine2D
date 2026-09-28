@@ -2,7 +2,11 @@
 #include "CityTaskComponent.h" // The decaying meter.
 #include "CooldownComponent.h" // The grace timer.
 #include "ZeroDayGameMode.h" // Where resources are spent.
-#include "Components/StaticMeshComponent.h" // The visible station.
+#include "Components/StaticMeshComponent.h" // The solid station body.
+#include "Components/SceneComponent.h" // The invisible root.
+#include "ZeroDaySprites.h" // Helper that lays sprites flat.
+#include "PaperSprite.h" // The artwork asset type.
+#include "PaperSpriteComponent.h" // Draws the artwork.
 #include "Kismet/GameplayStatics.h" // Lets us fetch the current game mode.
 #include "UObject/ConstructorHelpers.h" // Lets a constructor load engine assets.
 
@@ -11,8 +15,11 @@ ACityTaskActor::ACityTaskActor()
 {
 	PrimaryActorTick.bCanEverTick = false; // The components do the timing, not the actor.
 
-	TaskMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TaskMesh")); // The visible station body.
-	RootComponent = TaskMesh; // Make it the root of the actor.
+	TaskRoot = CreateDefaultSubobject<USceneComponent>(TEXT("TaskRoot")); // An invisible root with no scale of its own.
+	RootComponent = TaskRoot; // Everything else attaches to it.
+
+	TaskMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TaskMesh")); // The solid station body.
+	TaskMesh->SetupAttachment(TaskRoot); // Attach it to the root.
 
 	// Blockout mesh: a chest-high crate/console stand-in for whichever task this is.
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube")); // Find the engine cube once.
@@ -20,9 +27,20 @@ ACityTaskActor::ACityTaskActor()
 	{
 		TaskMesh->SetStaticMesh(CubeMeshAsset.Object); // Show the cube.
 	}
-	TaskMesh->SetRelativeScale3D(FVector(0.8f, 0.8f, 1.0f)); // Slightly narrower than a full cube.
+	TaskMesh->SetRelativeScale3D(FVector(1.3f, 1.3f, 0.6f)); // 130 wide and 60 tall: about the size of the artwork.
 
 	TaskMesh->SetCollisionResponseToAllChannels(ECR_Block); // Solid: the player walks around it.
+
+	TaskSprite = CreateDefaultSubobject<UPaperSpriteComponent>(TEXT("TaskSprite")); // The station artwork.
+	TaskSprite->SetupAttachment(TaskRoot); // Attach it to the root.
+	StationSprites.SetNum(3); // Power, Food, Medic.
+	static ConstructorHelpers::FObjectFinder<UPaperSprite> PowerFinder(TEXT("/Game/Sprites/S_station_power.S_station_power")); // Generator artwork.
+	static ConstructorHelpers::FObjectFinder<UPaperSprite> FoodFinder(TEXT("/Game/Sprites/S_station_food.S_station_food")); // Food store artwork.
+	static ConstructorHelpers::FObjectFinder<UPaperSprite> MedicFinder(TEXT("/Game/Sprites/S_station_medical.S_station_medical")); // Medical tent artwork.
+	if (PowerFinder.Succeeded()) { StationSprites[static_cast<int32>(ECityTaskKind::Power)] = PowerFinder.Object; } // Remember each one that exists.
+	if (FoodFinder.Succeeded()) { StationSprites[static_cast<int32>(ECityTaskKind::Food)] = FoodFinder.Object; }
+	if (MedicFinder.Succeeded()) { StationSprites[static_cast<int32>(ECityTaskKind::Medic)] = MedicFinder.Object; }
+	TaskSprite->SetRelativeScale3D(FVector(0.85f, 0.85f, 0.85f)); // Slightly smaller than the 160 unit artwork so it matches the body.
 
 	TaskComp = CreateDefaultSubobject<UCityTaskComponent>(TEXT("TaskComp")); // The decaying condition meter.
 	GraceTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("GraceTimer")); // The shared countdown timer.
@@ -33,9 +51,28 @@ void ACityTaskActor::BeginPlay()
 {
 	Super::BeginPlay(); // Let the base class start up first.
 
+	UpdateSprite(); // Show the right artwork for whichever station this is.
 	TaskComp->OnBecameCritical.AddDynamic(this, &ACityTaskActor::HandleBecameCritical); // Meter critical -> start the countdown.
 	TaskComp->OnAttended.AddDynamic(this, &ACityTaskActor::HandleAttended); // Attended -> stop the countdown.
 	GraceTimer->OnExpired.AddDynamic(this, &ACityTaskActor::HandleGraceExpired); // Countdown over -> the task fails.
+}
+
+// Chooses which station this is (used when the game builds the city) and shows its artwork.
+void ACityTaskActor::SetTaskKind(ECityTaskKind NewKind)
+{
+	TaskKind = NewKind; // Remember which station this is.
+	UpdateSprite(); // Show its artwork.
+}
+
+// Picks the artwork for the current TaskKind and hides the blockout body if it has one.
+void ACityTaskActor::UpdateSprite()
+{
+	UPaperSprite* Wanted = StationSprites.IsValidIndex(static_cast<int32>(TaskKind)) ? StationSprites[static_cast<int32>(TaskKind)].Get() : nullptr; // The artwork for this kind, if it exists.
+	if (Wanted) // We have artwork.
+	{
+		ZeroDaySprites::ConfigureFlat(TaskSprite, Wanted, ZeroDaySprites::UprightRotation(), 8.f); // Lay it flat and upright.
+		TaskMesh->SetVisibility(false); // Hide the blockout cube but keep its collision.
+	}
 }
 
 // Attending costs one of this station's resource. If the player can't pay, nothing happens.

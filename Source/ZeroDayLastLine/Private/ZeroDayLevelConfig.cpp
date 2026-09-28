@@ -24,6 +24,8 @@ FZeroDayLevelConfig FZeroDayLevelConfig::ForLevel(int32 Level)
 		Config.bSurgesEnabled = false; // No surge waves.
 		Config.StartingIntel = 3; // A few validations to learn with.
 		Config.StartingPatch = 3; // A few fixes to learn with.
+		Config.SupplyIntervalSeconds = 15.f; // A supply crate now and then.
+		Config.ThreatDropChance = 0.45f; // Shot threats often drop something, to teach that fighting pays.
 		break; // Done with level 1.
 
 	case 2: // Level 2 teaches Validate: every wall, and some threats are false positives.
@@ -43,6 +45,8 @@ FZeroDayLevelConfig FZeroDayLevelConfig::ForLevel(int32 Level)
 		Config.bSurgesEnabled = false; // Still no surges.
 		Config.StartingIntel = 4; // More validations for the extra walls.
 		Config.StartingPatch = 4; // More fixes for the extra walls.
+		Config.SupplyIntervalSeconds = 13.f; // Slightly more supplies.
+		Config.ThreatDropChance = 0.35f; // Fewer drops from threats.
 		break; // Done with level 2.
 
 	default: // Level 3 teaches Remediate under pressure: stations, surges and the hardest threats.
@@ -68,6 +72,8 @@ FZeroDayLevelConfig FZeroDayLevelConfig::ForLevel(int32 Level)
 		Config.StartingFood = 3; // Enough rations to keep the food store running twice, with a spare.
 		Config.StartingPower = 3; // Enough battery cells for the generator, with a spare.
 		Config.StartingMedical = 3; // Enough medical kits for the tent, with a spare.
+		Config.SupplyIntervalSeconds = 10.f; // Frequent supply drops, but more things need them.
+		Config.ThreatDropChance = 0.30f; // The fewest drops from threats.
 		break; // Done with level 3.
 	}
 

@@ -6,6 +6,7 @@
 #include "ZeroDayHUD.generated.h" // Unreal's generated reflection code (must be last include).
 
 class AZeroDayGameMode; // Forward declaration: where the data we draw comes from.
+class UTexture2D; // Forward declaration: the icon pictures.
 
 // Draws all player-facing information straight onto the canvas (no widget assets needed):
 // status panel, timer, resource counts, survivors, alerts, threat/wall markers, health
@@ -16,9 +17,19 @@ class ZERODAYLASTLINE_API AZeroDayHUD : public AHUD // Exported so other files c
 	GENERATED_BODY() // Unreal boilerplate for reflected classes.
 
 public:
+	AZeroDayHUD(); // Loads the icon pictures.
+
 	virtual void DrawHUD() override; // Called by the engine every frame to draw everything.
 
 private:
+	// One icon picture per resource type (indexed by EResourceType), and one for survivors.
+	// Missing pictures are replaced by plain coloured tiles.
+	UPROPERTY()
+	TArray<TObjectPtr<UTexture2D>> ResourceIcons;
+
+	UPROPERTY()
+	TObjectPtr<UTexture2D> SurvivorIcon;
+
 	void DrawTopBar(const AZeroDayGameMode& GameMode); // Title, timer and survivors.
 	void DrawResourcePanel(const AZeroDayGameMode& GameMode); // What the player is carrying and what it is for.
 	void DrawStatusPanel(const AZeroDayGameMode& GameMode); // Wall and station status rows.

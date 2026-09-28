@@ -6,6 +6,8 @@
 #include "DetectionComponent.h" // The scan cooldown.
 #include "ZeroDayTypes.h" // Enums and name helpers.
 #include "Engine/Canvas.h" // The drawing surface (SizeX / SizeY).
+#include "Engine/Texture2D.h" // The icon pictures.
+#include "UObject/ConstructorHelpers.h" // Lets a constructor load content assets.
 #include "Engine/Engine.h" // GEngine, for the default font.
 #include "EngineUtils.h" // TActorIterator.
 
@@ -76,6 +78,33 @@ namespace // Helpers and constants only this file uses.
 		case EResourceType::Power: return TEXT("Generator (E)"); // Spent at the power station.
 		default: return TEXT("Medical tent (E)"); // Spent at the medical station.
 		}
+	}
+}
+
+// Loads the icon pictures once. If any are missing the HUD falls back to coloured tiles.
+AZeroDayHUD::AZeroDayHUD()
+{
+	static const TCHAR* IconPaths[ZeroDayResourceTypeCount] = { // In EResourceType order.
+		TEXT("/Game/Sprites/T_pickup_intel.T_pickup_intel"),
+		TEXT("/Game/Sprites/T_pickup_patch.T_pickup_patch"),
+		TEXT("/Game/Sprites/T_pickup_food.T_pickup_food"),
+		TEXT("/Game/Sprites/T_pickup_power.T_pickup_power"),
+		TEXT("/Game/Sprites/T_pickup_medical.T_pickup_medical"),
+	};
+	ResourceIcons.SetNum(ZeroDayResourceTypeCount); // One slot per resource type.
+	for (int32 Index = 0; Index < ZeroDayResourceTypeCount; ++Index) // Load each icon.
+	{
+		ConstructorHelpers::FObjectFinder<UTexture2D> Finder(IconPaths[Index]); // Look it up.
+		if (Finder.Succeeded()) // Found it.
+		{
+			ResourceIcons[Index] = Finder.Object; // Remember it.
+		}
+	}
+
+	static ConstructorHelpers::FObjectFinder<UTexture2D> SurvivorFinder(TEXT("/Game/Sprites/T_icon_survivor.T_icon_survivor")); // The survivor picture.
+	if (SurvivorFinder.Succeeded()) // Found it.
+	{
+		SurvivorIcon = SurvivorFinder.Object; // Remember it.
 	}
 }
 
@@ -151,8 +180,14 @@ void AZeroDayHUD::DrawBar(float X, float Y, float Width, float Height, float Fra
 // A coloured tile with the resource's initial letter on it.
 void AZeroDayHUD::DrawResourceIcon(EResourceType Type, float X, float Y, float Size)
 {
-	DrawRect(ResourceColor(Type), X, Y, Size, Size); // The coloured tile.
-	DrawText(ResourceLetter(Type), FLinearColor::Black, X + Size * 0.28f, Y + Size * 0.08f, GEngine->GetMediumFont(), 0.8f, false); // The letter, roughly centred.
+	UTexture2D* Icon = ResourceIcons.IsValidIndex(static_cast<int32>(Type)) ? ResourceIcons[static_cast<int32>(Type)].Get() : nullptr; // The picture, if loaded.
+	if (Icon) // We have artwork.
+	{
+		DrawTexture(Icon, X, Y, Size, Size, 0.f, 0.f, 1.f, 1.f, FLinearColor::White, BLEND_Translucent); // Draw the whole picture into the square.
+		return; // Done.
+	}
+	DrawRect(ResourceColor(Type), X, Y, Size, Size); // Otherwise a coloured tile...
+	DrawText(ResourceLetter(Type), FLinearColor::Black, X + Size * 0.28f, Y + Size * 0.08f, GEngine->GetMediumFont(), 0.8f, false); // ...with the letter, roughly centred.
 }
 
 // Level name, time left to hold out, and (on levels with stations) the survivors.
@@ -169,15 +204,22 @@ void AZeroDayHUD::DrawTopBar(const AZeroDayGameMode& GameMode)
 
 	if (GameMode.GetLevelConfig().bTasksActive) // Survivors only matter when stations can fail.
 	{
-		constexpr float IconSize = 14.f; // Each survivor is a small square.
-		constexpr float IconGap = 5.f; // Space between squares.
+		constexpr float IconSize = 22.f; // Each survivor is a small icon.
+		constexpr float IconGap = 4.f; // Space between icons.
 		const int32 Max = GameMode.GetMaxSurvivors(); // How many started.
 		const int32 Alive = GameMode.GetSurvivors(); // How many are left.
 		const float TotalWidth = Max * IconSize + (Max - 1) * IconGap; // Width of the whole row.
 		float X = Canvas->SizeX - TotalWidth - 12.f; // Start so the row ends 12px from the right edge.
 		for (int32 Index = 0; Index < Max; ++Index) // One square per survivor.
 		{
-			DrawRect(Index < Alive ? GoodColor : FLinearColor(0.35f, 0.08f, 0.08f, 1.f), X, 10.f, IconSize, IconSize); // Green if alive, dark red if lost.
+			if (SurvivorIcon) // We have the picture.
+			{
+				DrawTexture(SurvivorIcon, X, 6.f, IconSize, IconSize, 0.f, 0.f, 1.f, 1.f, Index < Alive ? FLinearColor::White : FLinearColor(0.2f, 0.2f, 0.25f, 0.7f), BLEND_Translucent); // Full colour if alive, dim grey if lost.
+			}
+			else
+			{
+				DrawRect(Index < Alive ? GoodColor : FLinearColor(0.35f, 0.08f, 0.08f, 1.f), X, 10.f, IconSize, IconSize); // Otherwise a green square if alive, dark red if lost.
+			}
 			X += IconSize + IconGap; // Move to the next square.
 		}
 		float LabelWidth = 0.f; // Filled in by GetTextSize.
@@ -493,6 +535,8 @@ void AZeroDayHUD::DrawEndScreen(const AZeroDayGameMode& GameMode)
 	DrawCenteredText(FString::Printf(TEXT("False positives identified: %d"), Stats.FalsePositivesIdentified), TextColor, Y, 1.f); // Decoys exposed by Validate.
 	Y += 28.f; // Next line.
 	DrawCenteredText(FString::Printf(TEXT("Walls patched: %d"), Stats.WallsFixed), TextColor, Y, 1.f); // Breaches repaired.
+	Y += 28.f; // Next line.
+	DrawCenteredText(FString::Printf(TEXT("Supplies collected: %d"), Stats.SuppliesCollected), TextColor, Y, 1.f); // Pickups the player gathered.
 	if (GameMode.GetLevelConfig().bTasksActive) // Survivors only matter with stations.
 	{
 		Y += 28.f; // Next line.

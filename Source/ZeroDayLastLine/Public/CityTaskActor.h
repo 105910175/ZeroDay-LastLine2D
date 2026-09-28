@@ -7,7 +7,10 @@
 
 class UCityTaskComponent; // Forward declaration: the decaying meter.
 class UCooldownComponent; // Forward declaration: the grace timer.
-class UStaticMeshComponent; // Forward declaration: the visible station.
+class UStaticMeshComponent; // Forward declaration: the solid station body.
+class USceneComponent; // Forward declaration: the invisible root.
+class UPaperSpriteComponent; // Forward declaration: the station artwork.
+class UPaperSprite; // Forward declaration: a piece of station artwork.
 class ACityTaskActor; // Forward declaration so the delegate below can name this class.
 
 // Fired when a station runs out its grace period while still critical.
@@ -48,6 +51,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CityTask")
 	float GetCondition() const;
 
+	// Chooses which station this is and shows the matching artwork.
+	UFUNCTION(BlueprintCallable, Category = "CityTask")
+	void SetTaskKind(ECityTaskKind NewKind);
+
 	// Shows/hides the station and pauses its decay for the current level.
 	UFUNCTION(BlueprintCallable, Category = "CityTask")
 	void SetActiveThisLevel(bool bActive);
@@ -58,9 +65,21 @@ public:
 protected:
 	virtual void BeginPlay() override; // Wires the meter to the grace timer.
 
-	// Visible, solid station the player walks up to.
+	// Invisible root so the body's scale does not distort the artwork.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CityTask")
+	TObjectPtr<USceneComponent> TaskRoot;
+
+	// Solid station body the player walks around. Hidden when artwork is available.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CityTask")
 	TObjectPtr<UStaticMeshComponent> TaskMesh;
+
+	// The station's artwork, which depends on TaskKind.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CityTask")
+	TObjectPtr<UPaperSpriteComponent> TaskSprite;
+
+	// One picture per station kind, indexed by ECityTaskKind.
+	UPROPERTY()
+	TArray<TObjectPtr<UPaperSprite>> StationSprites;
 
 	// The decaying condition meter.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CityTask")
@@ -71,6 +90,9 @@ protected:
 	TObjectPtr<UCooldownComponent> GraceTimer;
 
 private:
+	// Shows the artwork for the current TaskKind.
+	void UpdateSprite();
+
 	// Runs when the meter first drops to the critical threshold.
 	UFUNCTION()
 	void HandleBecameCritical();

@@ -8,6 +8,7 @@
 class AWallActor; // Forward declaration: the wall this threat is heading for.
 class USphereComponent; // Forward declaration: the collision body.
 class UStaticMeshComponent; // Forward declaration: the visible stand-in mesh.
+class UPaperSpriteComponent; // Forward declaration: the sprite artwork.
 
 // A single attacker (zombie stand-in for a threat/exploit attempt). Walks straight at its
 // TargetWall and deals contact damage on arrival, or can be killed first by an
@@ -81,7 +82,11 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Threat")
 	TObjectPtr<USphereComponent> HitSphere;
 
-	// Visual stand-in only, no collision.
+	// Visual stand-in only, no collision. Hidden when the sprite artwork is available.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Threat")
 	TObjectPtr<UStaticMeshComponent> BodyMesh;
+
+	// The threat's artwork. It turns with the threat so it faces the way it walks.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Threat")
+	TObjectPtr<UPaperSpriteComponent> BodySprite;
 };

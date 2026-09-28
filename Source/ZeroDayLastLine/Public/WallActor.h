@@ -7,8 +7,11 @@
 
 class UBreachableComponent; // Forward declaration: tracks health and status.
 class UCooldownComponent; // Forward declaration: the breach countdown timer.
+class USceneComponent; // Forward declaration: the invisible root everything hangs off.
 class UStaticMeshComponent; // Forward declaration: the solid wall body.
 class UBoxComponent; // Forward declaration: trigger volume for arriving threats.
+class UPaperSpriteComponent; // Forward declaration: draws one tile of the wall's artwork.
+class UPaperSprite; // Forward declaration: a piece of wall artwork.
 class AWallActor; // Forward declaration so the delegates below can name this class.
 class AThreatPawn; // Forward declaration: the attackers heading for this wall.
 
@@ -30,6 +33,10 @@ public:
 	// Which side of the city this wall guards.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wall")
 	EWallSide WallSide = EWallSide::North;
+
+	// How long the wall is along its long axis, in world units.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wall")
+	float WallLength = 300.f;
 
 	// Seconds the player has to fix or clear a breach before the wall is lost.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wall")
@@ -77,7 +84,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Wall")
 	void TakeThreatDamage(float Amount);
 
-	// The player's patch action: fully repairs the wall if it is breached. Returns true if it fixed something.
+	// The player's patch action: costs a Patch kit and fully repairs the wall if it is breached. Returns true if it fixed something.
 	UFUNCTION(BlueprintCallable, Category = "Wall")
 	bool AttemptFix();
 
@@ -89,6 +96,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Wall")
 	void SetActiveThisLevel(bool bActive);
 
+	// Resizes the wall (its body, trigger zone and artwork) to a new length.
+	UFUNCTION(BlueprintCallable, Category = "Wall")
+	void SetWallLength(float NewLength);
+
 	// Applies a level's rules to this wall (currently just the breach countdown length).
 	void ApplyLevelSettings(float NewRemediationWindowSeconds);
 
@@ -98,7 +109,11 @@ public:
 protected:
 	virtual void BeginPlay() override; // Binds the component events once everything exists.
 
-	// Visible, solid wall (blocks the player and threats).
+	// Invisible root so the mesh's scale does not affect the artwork.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Wall")
+	TObjectPtr<USceneComponent> WallRoot;
+
+	// Solid wall body (blocks the player, threats and pickups). Hidden when artwork is available.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Wall")
 	TObjectPtr<UStaticMeshComponent> WallMesh;
 
@@ -114,9 +129,32 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Wall")
 	TObjectPtr<UCooldownComponent> RemediationTimer;
 
+	// The wall's artwork for each condition.
+	UPROPERTY()
+	TObjectPtr<UPaperSprite> IntactSprite;
+
+	UPROPERTY()
+	TObjectPtr<UPaperSprite> DamagedSprite;
+
+	UPROPERTY()
+	TObjectPtr<UPaperSprite> BreachedSprite;
+
+	// The artwork is repeated along the wall in tiles, so any length looks right.
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UPaperSpriteComponent>> SpriteTiles;
+
 private:
 	// Threats currently heading for this wall. Weak pointers so destroyed threats drop out safely.
 	TArray<TWeakObjectPtr<AThreatPawn>> InboundThreats;
+
+	// True when the artwork assets were found, so the blockout mesh can stay hidden.
+	bool bHasSprites = false;
+
+	// Rebuilds the row of sprite tiles for the current length.
+	void RebuildVisuals();
+
+	// Switches every tile to the artwork matching the wall's current condition.
+	void UpdateVisuals();
 
 	// Reacts to the Breachable component changing status.
 	UFUNCTION()

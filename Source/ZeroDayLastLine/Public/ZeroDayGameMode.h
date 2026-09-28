@@ -12,6 +12,7 @@ class AWallActor; // Forward declaration: the four city walls.
 class ACityTaskActor; // Forward declaration: the power/food/medical stations.
 class AThreatSpawnerActor; // Forward declaration: the things that send threats.
 class AThreatPawn; // Forward declaration: the attackers.
+class AResourcePickup; // Forward declaration: collectable resources.
 class UCooldownComponent; // Forward declaration: the reusable timer.
 
 // A short message shown by the HUD until ExpireTime (world seconds).
@@ -39,6 +40,7 @@ struct FZeroDayLevelStats
 	int32 FalsePositivesIdentified = 0; // False positives revealed by Validate.
 	int32 WallsFixed = 0; // Breached walls the player patched.
 	int32 SurvivorsLost = 0; // Survivors lost to stations that ran out.
+	int32 SuppliesCollected = 0; // Resource pickups the player collected.
 };
 
 /**
@@ -136,6 +138,7 @@ public:
 	// Statistics recorded as the player plays, for the result screen.
 	void RecordFalsePositivesIdentified(int32 Count) { Stats.FalsePositivesIdentified += Count; } // Validate found decoys.
 	void RecordWallFixed() { ++Stats.WallsFixed; } // The player patched a wall.
+	void RecordSupplyCollected() { ++Stats.SuppliesCollected; } // The player picked up a resource.
 	const FZeroDayLevelStats& GetStats() const { return Stats; } // Read the totals.
 
 	// The rules of the level currently being played.
@@ -185,6 +188,16 @@ private:
 	UFUNCTION()
 	void HandleSurge();
 
+	// Runs each time the supply timer fires: a resource crate lands inside the city.
+	UFUNCTION()
+	void HandleSupplyDrop();
+
+	// Picks which resource to hand out next, favouring whichever the player has least of.
+	EResourceType ChooseSupplyType() const;
+
+	// Works out the middle of the city and how far supplies may land from it.
+	void MeasureCity();
+
 	// Stops the timers and spawners and records the result for the HUD.
 	void EndGame(bool bWon, const FString& Reason);
 
@@ -206,6 +219,13 @@ private:
 	// Looping timer that triggers a zero-day surge on levels that have them.
 	UPROPERTY(VisibleAnywhere, Category = "ZeroDay")
 	TObjectPtr<UCooldownComponent> SurgeTimer;
+
+	// Looping timer that drops a resource crate inside the city.
+	UPROPERTY(VisibleAnywhere, Category = "ZeroDay")
+	TObjectPtr<UCooldownComponent> SupplyTimer;
+
+	FVector CityCentre = FVector::ZeroVector; // Middle of the walls.
+	float CitySupplyRadius = 300.f; // How far from the middle supply crates may land.
 
 	// Everything below is found (or built) in the level at BeginPlay.
 	UPROPERTY(Transient)

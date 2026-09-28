@@ -5,6 +5,7 @@
 #include "CityTaskActor.h" // The city stations.
 #include "ThreatSpawnerActor.h" // The threat spawners.
 #include "ThreatPawn.h" // The threats (cleared between levels).
+#include "ResourcePickup.h" // Collectable resources.
 #include "CooldownComponent.h" // The reusable timer used for the level and surges.
 #include "ZeroDayTypes.h" // Shared enums and name helpers.
 #include "ZeroDayCharacter.h" // The player (default pawn and movement directions).
@@ -20,6 +21,7 @@ AZeroDayGameMode::AZeroDayGameMode()
 
 	LevelTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("LevelTimer")); // Counts down the level.
 	SurgeTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("SurgeTimer")); // Triggers surge waves.
+	SupplyTimer = CreateDefaultSubobject<UCooldownComponent>(TEXT("SupplyTimer")); // Triggers supply drops.
 }
 
 // Find everything placed in the level (or build a default city), subscribe to events, then start the level.
@@ -47,6 +49,7 @@ void AZeroDayGameMode::BeginPlay()
 
 	LevelTimer->OnExpired.AddDynamic(this, &AZeroDayGameMode::HandleLevelSurvived); // Timer ends -> the player wins.
 	SurgeTimer->OnExpired.AddDynamic(this, &AZeroDayGameMode::HandleSurge); // Surge timer fires -> send a wave.
+	SupplyTimer->OnExpired.AddDynamic(this, &AZeroDayGameMode::HandleSupplyDrop); // Supply timer fires -> drop a crate.
 
 	StartLevel(CurrentLevel); // Begin at whichever level is selected (level 1 by default).
 }
@@ -110,7 +113,6 @@ void AZeroDayGameMode::BuildDefaultLayout()
 		float Distance; // How far from the centre.
 		float WallLength; // How long the wall is along the edge of the city.
 	};
-	constexpr float WallBaseLength = 300.f; // A wall is 300 units long before scaling (the mesh is 100 x 3).
 	constexpr float WallCoverage = 0.8f; // Each wall covers 80% of its side of the city, leaving gaps at the corners.
 	const FSideSetup Sides[] = {
 		{ EWallSide::North, Forward, CityHalfExtents.Y, 2.f * CityHalfExtents.X * WallCoverage }, // Front wall spans the width.
@@ -123,13 +125,13 @@ void AZeroDayGameMode::BuildDefaultLayout()
 	{
 		const FVector WallPosition = Centre + Setup.Direction * Setup.Distance; // Where the wall stands.
 		const FRotator WallRotation(0.f, Setup.Direction.Rotation().Yaw + 90.f, 0.f); // Turn it so its long side faces the centre.
-		const FTransform WallTransform(WallRotation, WallPosition, FVector(Setup.WallLength / WallBaseLength, 1.f, 1.f)); // Stretch only along the wall's long axis.
-		AWallActor* Wall = World->SpawnActor<AWallActor>(AWallActor::StaticClass(), WallTransform, SpawnParams); // Build the wall.
+		AWallActor* Wall = World->SpawnActor<AWallActor>(AWallActor::StaticClass(), WallPosition, WallRotation, SpawnParams); // Build the wall.
 		if (!Wall) // Spawn failed.
 		{
 			continue; // Skip this side.
 		}
 		Wall->WallSide = Setup.Side; // Tell the wall which side it guards.
+		Wall->SetWallLength(Setup.WallLength); // Stretch it along its edge of the city.
 		RegisterWall(Wall); // Track it.
 
 		const FVector SpawnerPosition = Centre + Setup.Direction * (Setup.Distance + SpawnerDistanceBeyondWall); // Outside the wall.
@@ -157,7 +159,7 @@ void AZeroDayGameMode::BuildDefaultLayout()
 		ACityTaskActor* Task = World->SpawnActor<ACityTaskActor>(ACityTaskActor::StaticClass(), Setup.Position, FRotator::ZeroRotator, SpawnParams); // Build it.
 		if (Task) // Spawn worked.
 		{
-			Task->TaskKind = Setup.Kind; // Power, food or medical.
+			Task->SetTaskKind(Setup.Kind); // Power, food or medical (also shows the matching artwork).
 			RegisterTask(Task); // Track it.
 		}
 	}
@@ -181,6 +183,18 @@ void AZeroDayGameMode::StartLevel(int32 Level)
 	{
 		Threat->Destroy(); // Gone (spawners and walls are told automatically).
 	}
+
+	TArray<AResourcePickup*> LeftoverPickups; // Pickups from the previous run.
+	for (TActorIterator<AResourcePickup> It(GetWorld()); It; ++It) // Find every live pickup.
+	{
+		LeftoverPickups.Add(*It); // Collect first so we don't destroy while iterating.
+	}
+	for (AResourcePickup* Pickup : LeftoverPickups) // Now remove them all.
+	{
+		Pickup->Destroy(); // Gone.
+	}
+
+	MeasureCity(); // Work out where the city is so supply drops land inside it.
 
 	for (AWallActor* Wall : Walls) // Set up every wall.
 	{
@@ -230,6 +244,9 @@ void AZeroDayGameMode::StartLevel(int32 Level)
 
 	LevelTimer->CancelCooldown(); // Drop any old countdown...
 	LevelTimer->StartCooldown(Config.DurationSeconds, false); // ...and start this level's one-shot countdown.
+
+	SupplyTimer->CancelCooldown(); // Drop any old supply timer...
+	SupplyTimer->StartCooldown(Config.SupplyIntervalSeconds, true); // ...and start this level's looping supply drops.
 
 	SurgeTimer->CancelCooldown(); // Drop any old surge timer.
 	if (Config.bSurgesEnabled) // Only some levels have surges.
@@ -343,6 +360,93 @@ void AZeroDayGameMode::OnThreatKilled(const AThreatPawn* Threat)
 		++Stats.ThreatsStopped; // Count the real threat.
 	}
 	PostEffect(Threat->GetActorLocation(), FLinearColor(1.f, 0.75f, 0.3f), 70.f, 0.4f); // Same colour for everyone so it doesn't reveal severity.
+
+	if (!Threat->bIsDecoy && FMath::FRand() < Config.ThreatDropChance) // Real threats sometimes drop something useful.
+	{
+		AResourcePickup::SpawnScattered(GetWorld(), ChooseSupplyType(), Threat->GetActorLocation(), 550.f); // Fling it out where the threat fell.
+	}
+}
+
+// Works out the middle of the city and how far from it supplies may land.
+void AZeroDayGameMode::MeasureCity()
+{
+	if (Walls.Num() == 0) // No walls to measure.
+	{
+		const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0); // Fall back to the player's position.
+		CityCentre = Player ? Player->GetActorLocation() : FVector::ZeroVector; // Or the origin.
+		return; // Keep the default radius.
+	}
+
+	FVector Sum = FVector::ZeroVector; // Adds up every wall's position.
+	for (const AWallActor* Wall : Walls) // Look at each wall.
+	{
+		Sum += Wall ? Wall->GetActorLocation() : FVector::ZeroVector; // Add its position.
+	}
+	CityCentre = Sum / static_cast<float>(Walls.Num()); // The average is the middle of the city.
+
+	float NearestWall = TNumericLimits<float>::Max(); // Distance to the closest wall.
+	for (const AWallActor* Wall : Walls) // Look at each wall again.
+	{
+		if (Wall) // Skip destroyed ones.
+		{
+			NearestWall = FMath::Min(NearestWall, FVector::Dist2D(CityCentre, Wall->GetActorLocation())); // Track the smallest distance.
+		}
+	}
+	CitySupplyRadius = FMath::Max(150.f, NearestWall * 0.6f); // Supplies land within 60% of the way to the nearest wall.
+}
+
+// Chooses the next resource to hand out, usually the one the player is shortest of.
+EResourceType AZeroDayGameMode::ChooseSupplyType() const
+{
+	TArray<EResourceType, TInlineAllocator<ZeroDayResourceTypeCount>> Candidates; // The resources that matter on this level.
+	Candidates.Add(EResourceType::Intel); // Always useful.
+	Candidates.Add(EResourceType::Patch); // Always useful.
+	if (Config.bTasksActive) // Stations only need supplies on the levels that use them.
+	{
+		Candidates.Add(EResourceType::Food); // Feeds the food store.
+		Candidates.Add(EResourceType::Power); // Runs the generator.
+		Candidates.Add(EResourceType::Medical); // Stocks the medical tent.
+	}
+
+	if (FMath::FRand() < 0.35f) // Sometimes just pick at random so drops aren't predictable.
+	{
+		return Candidates[FMath::RandRange(0, Candidates.Num() - 1)]; // Any candidate.
+	}
+
+	int32 Lowest = TNumericLimits<int32>::Max(); // The smallest stock among the candidates.
+	for (EResourceType Type : Candidates) // Find it.
+	{
+		Lowest = FMath::Min(Lowest, GetResource(Type)); // Track the minimum.
+	}
+	TArray<EResourceType, TInlineAllocator<ZeroDayResourceTypeCount>> Neediest; // All candidates tied for the lowest stock.
+	for (EResourceType Type : Candidates) // Collect them.
+	{
+		if (GetResource(Type) == Lowest) // Tied for the lowest?
+		{
+			Neediest.Add(Type); // Add it.
+		}
+	}
+	return Neediest[FMath::RandRange(0, Neediest.Num() - 1)]; // Pick one of the neediest at random.
+}
+
+// A supply crate lands somewhere inside the city and skids to a stop.
+void AZeroDayGameMode::HandleSupplyDrop()
+{
+	if (bGameEnded) // Nothing drops once the level is over.
+	{
+		return; // Ignore.
+	}
+
+	const float Angle = FMath::FRandRange(0.f, 2.f * PI); // Random direction from the middle.
+	const float Distance = CitySupplyRadius * FMath::Sqrt(FMath::FRand()); // Random distance (sqrt keeps the spread even across the area).
+	const FVector Location = CityCentre + FVector(FMath::Cos(Angle) * Distance, FMath::Sin(Angle) * Distance, 0.f); // The landing spot.
+	const EResourceType Type = ChooseSupplyType(); // What is inside.
+
+	if (AResourcePickup::SpawnScattered(GetWorld(), Type, Location, 250.f)) // Drop it with a little skid.
+	{
+		PostAlert(FString::Printf(TEXT("Supply drop inside the city: %s"), ResourceTypeToString(Type)), FColor(255, 220, 110)); // Tell the player what and roughly where.
+		PostEffect(Location, FLinearColor(1.f, 0.85f, 0.3f), 160.f, 0.8f); // A gold ring marks the spot.
+	}
 }
 
 // Seconds left to survive, for the HUD.
@@ -463,6 +567,7 @@ void AZeroDayGameMode::EndGame(bool bWon, const FString& Reason)
 
 	LevelTimer->CancelCooldown(); // Stop the level countdown.
 	SurgeTimer->CancelCooldown(); // Stop any surges.
+	SupplyTimer->CancelCooldown(); // Stop supply drops.
 	for (AThreatSpawnerActor* Spawner : Spawners) // Stop every spawner.
 	{
 		if (Spawner) // Skip destroyed ones.

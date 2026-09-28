@@ -1,6 +1,10 @@
 #include "ThreatPawn.h" // This class's own declaration.
 #include "WallActor.h" // So the threat can hurt and unregister from its wall.
 #include "ZeroDayGameMode.h" // So the game mode can record when a threat is shot.
+#include "ZeroDayPhysics.h" // The threat's physics material.
+#include "ZeroDaySprites.h" // Helper that lays sprites flat.
+#include "PaperSprite.h" // The artwork asset type.
+#include "PaperSpriteComponent.h" // Draws the artwork.
 #include "Kismet/GameplayStatics.h" // Lets us fetch the current game mode.
 #include "Components/SphereComponent.h" // The collision body.
 #include "Components/StaticMeshComponent.h" // The visible stand-in.
@@ -30,12 +34,22 @@ AThreatPawn::AThreatPawn()
 	}
 	BodyMesh->SetRelativeScale3D(FVector(0.4f, 0.4f, 1.0f)); // Thin and tall.
 	BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, -50.f)); // Sit it so its base is at ground level.
+
+	BodySprite = CreateDefaultSubobject<UPaperSpriteComponent>(TEXT("BodySprite")); // The zombie artwork.
+	BodySprite->SetupAttachment(RootComponent); // It moves and turns with the threat.
+	static ConstructorHelpers::FObjectFinder<UPaperSprite> SpriteFinder(TEXT("/Game/Sprites/S_threat.S_threat")); // Find the artwork once.
+	if (SpriteFinder.Succeeded()) // If it exists...
+	{
+		ZeroDaySprites::ConfigureFlat(BodySprite, SpriteFinder.Object, ZeroDaySprites::HeadingRotation(), 4.f); // ...lay it flat, facing the walking direction...
+		BodyMesh->SetVisibility(false); // ...and hide the blockout cylinder.
+	}
 }
 
 // Nothing extra to do when the threat appears.
 void AThreatPawn::BeginPlay()
 {
 	Super::BeginPlay(); // Let the base class finish starting up.
+	HitSphere->SetPhysMaterialOverride(ZeroDayPhysics::Get(EZeroDayMaterial::Threat)); // Slippery, non-bouncy body.
 }
 
 // Tell the wall this threat is gone so scans and validation stay accurate.

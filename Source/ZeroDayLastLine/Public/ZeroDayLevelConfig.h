@@ -33,6 +33,8 @@ struct ZERODAYLASTLINE_API FZeroDayLevelConfig
 	int32 StartingPower = 0;               // Power cells (spent at the generator) at the start.
 	int32 StartingMedical = 0;             // Medical kits (spent at the medical tent) at the start.
 	int32 StartingSurvivors = 5;           // Survivors sheltering in the city. Failing stations costs lives.
+	float SupplyIntervalSeconds = 14.f;    // Seconds between supply drops inside the city.
+	float ThreatDropChance = 0.4f;         // Chance (0-1) a real threat drops a resource when shot.
 
 	// Returns the rules for a level. Out-of-range levels are clamped into 1..MaxLevel.
 	static FZeroDayLevelConfig ForLevel(int32 Level);
