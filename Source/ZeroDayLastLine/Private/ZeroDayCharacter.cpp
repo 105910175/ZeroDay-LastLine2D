@@ -30,7 +30,8 @@ AZeroDayCharacter::AZeroDayCharacter()
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 1200.f;
-	CameraBoom->SetRelativeRotation(FRotator(-70.f, 0.f, 0.f));
+	CameraBoom->SetUsingAbsoluteRotation(true); // Keep the camera fixed in the world. Without this it turns whenever the character turns to face its movement.
+	CameraBoom->SetRelativeRotation(FRotator(-70.f, 0.f, 0.f)); // With absolute rotation this is a fixed world angle: looking down, screen-up is world +X.
 	CameraBoom->bDoCollisionTest = false;
 	CameraBoom->bUsePawnControlRotation = false;
 
