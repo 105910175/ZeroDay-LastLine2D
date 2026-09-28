@@ -27,7 +27,12 @@ struct ZERODAYLASTLINE_API FZeroDayLevelConfig
 	bool bSurgesEnabled = false;           // True when periodic zero-day surge waves happen.
 	float SurgeIntervalSeconds = 40.f;     // Seconds between surge waves.
 	int32 SurgeThreatCount = 4;            // Critical threats sent in each surge.
-	int32 StartingResources = 6;           // Shared resource pool at the start of the level.
+	int32 StartingIntel = 3;               // Intel (spent on Validate) at the start of the level.
+	int32 StartingPatch = 3;               // Patch kits (spent on fixing walls) at the start.
+	int32 StartingFood = 0;                // Food (spent at the food store) at the start.
+	int32 StartingPower = 0;               // Power cells (spent at the generator) at the start.
+	int32 StartingMedical = 0;             // Medical kits (spent at the medical tent) at the start.
+	int32 StartingSurvivors = 5;           // Survivors sheltering in the city. Failing stations costs lives.
 
 	// Returns the rules for a level. Out-of-range levels are clamped into 1..MaxLevel.
 	static FZeroDayLevelConfig ForLevel(int32 Level);

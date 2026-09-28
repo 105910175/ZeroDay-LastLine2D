@@ -37,6 +37,10 @@ void UDetectionComponent::PerformScan()
 	}
 	// Start the cooldown as soon as a scan is used.
 	NextScanTime = GetWorld()->GetTimeSeconds() + ScanCooldownSeconds;
+	if (GetOwner()) // If we know where the player is...
+	{
+		GameMode->PostEffect(GetOwner()->GetActorLocation(), FLinearColor(0.3f, 0.8f, 1.f), 900.f, 0.7f); // ...send a wide cyan scan pulse out from them.
+	}
 
 	int32 TotalContacts = 0;
 	for (AWallActor* Wall : GameMode->GetWalls())
@@ -51,7 +55,7 @@ void UDetectionComponent::PerformScan()
 		{
 			TotalContacts += Contacts;
 			GameMode->PostAlert(FString::Printf(TEXT("Insta Scan: exposure detected on %s wall (%d contact%s)"),
-				WallSideToString(Wall->WallSide), Contacts, Contacts == 1 ? TEXT("") : TEXT("s")), FColor::Red);
+				WallSideToString(Wall->WallSide), Contacts, Contacts == 1 ? TEXT("") : TEXT("s")), FColor(255, 105, 90));
 		}
 	}
 
@@ -101,9 +105,9 @@ void UDetectionComponent::PerformValidate()
 	}
 
 	// Pay only after every other check has passed.
-	if (!GameMode->SpendResource(ValidateCost))
+	if (!GameMode->SpendResource(EResourceType::Intel, ValidateCost))
 	{
-		GameMode->PostAlert(TEXT("Validate: not enough resources"), FColor::Orange);
+		GameMode->PostAlert(TEXT("Validate needs Intel. Collect some first."), FColor::Orange);
 		return;
 	}
 
@@ -111,6 +115,8 @@ void UDetectionComponent::PerformValidate()
 	int32 FalsePositives = 0;
 	EThreatSeverity Highest = EThreatSeverity::Low;
 	Target->ValidateInbound(Real, FalsePositives, Highest);
+	GameMode->RecordFalsePositivesIdentified(FalsePositives); // Count the decoys we exposed for the result screen.
+	GameMode->PostEffect(Target->GetActorLocation(), FLinearColor(1.f, 0.85f, 0.3f), 220.f, 0.6f); // Gold ring on the wall that was validated.
 
 	FString Result = FString::Printf(TEXT("Validate (%s wall): "), WallSideToString(Target->WallSide));
 	if (Real > 0)

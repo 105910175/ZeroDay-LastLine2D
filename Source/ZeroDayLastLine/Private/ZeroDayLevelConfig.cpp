@@ -22,7 +22,8 @@ FZeroDayLevelConfig FZeroDayLevelConfig::ForLevel(int32 Level)
 		Config.MediumChance = 0.25f; // Mostly low severity.
 		Config.RemediationWindowSeconds = 15.f; // Generous time to fix a breach.
 		Config.bSurgesEnabled = false; // No surge waves.
-		Config.StartingResources = 6; // Enough to try Validate and Fix.
+		Config.StartingIntel = 3; // A few validations to learn with.
+		Config.StartingPatch = 3; // A few fixes to learn with.
 		break; // Done with level 1.
 
 	case 2: // Level 2 teaches Validate: every wall, and some threats are false positives.
@@ -40,7 +41,8 @@ FZeroDayLevelConfig FZeroDayLevelConfig::ForLevel(int32 Level)
 		Config.MediumChance = 0.35f; // A fair number of medium ones.
 		Config.RemediationWindowSeconds = 12.f; // Less time to fix breaches.
 		Config.bSurgesEnabled = false; // Still no surges.
-		Config.StartingResources = 8; // A few more resources for the extra walls.
+		Config.StartingIntel = 4; // More validations for the extra walls.
+		Config.StartingPatch = 4; // More fixes for the extra walls.
 		break; // Done with level 2.
 
 	default: // Level 3 teaches Remediate under pressure: stations, surges and the hardest threats.
@@ -61,7 +63,11 @@ FZeroDayLevelConfig FZeroDayLevelConfig::ForLevel(int32 Level)
 		Config.bSurgesEnabled = true; // Periodic zero-day surge waves.
 		Config.SurgeIntervalSeconds = 40.f; // A surge every forty seconds.
 		Config.SurgeThreatCount = 4; // Four critical threats per surge.
-		Config.StartingResources = 10; // The most starting resources, and the most demands on them.
+		Config.StartingIntel = 4; // Validations for four walls.
+		Config.StartingPatch = 4; // Fixes for four walls.
+		Config.StartingFood = 3; // Enough rations to keep the food store running twice, with a spare.
+		Config.StartingPower = 3; // Enough battery cells for the generator, with a spare.
+		Config.StartingMedical = 3; // Enough medical kits for the tent, with a spare.
 		break; // Done with level 3.
 	}
 

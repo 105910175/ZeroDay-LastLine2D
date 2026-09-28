@@ -1,5 +1,7 @@
 #include "ThreatPawn.h" // This class's own declaration.
 #include "WallActor.h" // So the threat can hurt and unregister from its wall.
+#include "ZeroDayGameMode.h" // So the game mode can record when a threat is shot.
+#include "Kismet/GameplayStatics.h" // Lets us fetch the current game mode.
 #include "Components/SphereComponent.h" // The collision body.
 #include "Components/StaticMeshComponent.h" // The visible stand-in.
 #include "UObject/ConstructorHelpers.h" // Lets a constructor load engine assets.
@@ -73,6 +75,7 @@ void AThreatPawn::InitialiseThreat(AWallActor* InTargetWall, EThreatSeverity InS
 	ContactDamage = bIsDecoy ? 0.f : ContactDamage * DamageScale; // False positives are harmless.
 	Health *= SeverityHealthScale * HealthScale; // Apply severity and level health scaling.
 	MoveSpeed *= SpeedScale; // Apply the level's speed scaling.
+	MaxHealth = Health; // Remember the starting health for the HUD's health bar.
 
 	if (TargetWall) // If we have a wall to attack...
 	{
@@ -106,6 +109,10 @@ void AThreatPawn::ApplyHitDamage(float Amount)
 	Health -= Amount; // Lose health.
 	if (Health <= 0.f) // Dead?
 	{
+		if (AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this))) // Find our game mode.
+		{
+			GameMode->OnThreatKilled(this); // Let it count the kill and show a burst.
+		}
 		Destroy(); // Remove the threat from the world.
 	}
 }

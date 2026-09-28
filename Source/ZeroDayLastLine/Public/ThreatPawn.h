@@ -32,6 +32,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat")
 	float ContactDamage = 20.f;
 
+	// Health when the threat spawned (after scaling), so the HUD can draw a health bar.
+	UPROPERTY(BlueprintReadOnly, Category = "Threat")
+	float MaxHealth = 30.f;
+
 	// The wall this threat is heading for.
 	UPROPERTY(BlueprintReadWrite, Category = "Threat")
 	TObjectPtr<AWallActor> TargetWall;
@@ -53,6 +57,9 @@ public:
 	void MarkValidated() { bValidated = true; } // Set by validation.
 	bool IsDetected() const { return bDetected; } // Has a scan found this threat?
 	bool IsValidated() const { return bValidated; } // Has validation revealed its identity?
+
+	// Health left as a 0-1 fraction, for health bars.
+	float GetHealthFraction() const { return MaxHealth > 0.f ? FMath::Clamp(Health / MaxHealth, 0.f, 1.f) : 0.f; }
 
 	// Called by projectiles. The threat is removed once its health runs out.
 	UFUNCTION(BlueprintCallable, Category = "Threat")

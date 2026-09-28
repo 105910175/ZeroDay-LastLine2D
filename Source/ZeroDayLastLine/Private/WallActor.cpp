@@ -2,6 +2,8 @@
 #include "BreachableComponent.h" // Health and status logic.
 #include "CooldownComponent.h" // Breach countdown timer.
 #include "ThreatPawn.h" // So we can talk to arriving threats.
+#include "ZeroDayGameMode.h" // Where Patch kits are spent and stats are kept.
+#include "Kismet/GameplayStatics.h" // Lets us fetch the current game mode.
 #include "Components/StaticMeshComponent.h" // The wall body.
 #include "Components/BoxComponent.h" // The threat trigger volume.
 #include "UObject/ConstructorHelpers.h" // Lets a constructor load engine assets.
@@ -14,13 +16,13 @@ AWallActor::AWallActor()
 	WallMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WallMesh")); // Create the visible, solid body.
 	RootComponent = WallMesh; // Make the mesh the actor's root so everything else attaches to it.
 
-	// Blockout mesh so the wall is visible before real art exists: a 100 unit engine cube stretched into a rampart.
+	// Blockout mesh so the wall is visible before real art exists: a 100 unit engine cube stretched into a low rampart.
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube")); // Find the engine cube once.
 	if (CubeMeshAsset.Succeeded()) // Only use it if the engine asset was found.
 	{
 		WallMesh->SetStaticMesh(CubeMeshAsset.Object); // Show the cube.
 	}
-	WallMesh->SetRelativeScale3D(FVector(3.0f, 0.6f, 1.5f)); // 300 wide, 60 deep, 150 tall.
+	WallMesh->SetRelativeScale3D(FVector(3.0f, 0.5f, 0.6f)); // 300 long, 50 deep, 60 tall: low enough not to hide the map behind it.
 
 	WallMesh->SetCollisionObjectType(ECC_GameTraceChannel1); // Wall channel (GameTraceChannel1).
 	WallMesh->SetCollisionResponseToAllChannels(ECR_Block); // Block everything by default...
@@ -28,8 +30,8 @@ AWallActor::AWallActor()
 
 	ThreatContactZone = CreateDefaultSubobject<UBoxComponent>(TEXT("ThreatContactZone")); // Trigger volume around the wall.
 	ThreatContactZone->SetupAttachment(RootComponent); // Attach it to the wall so it moves with it.
-	// The zone inherits the mesh's 3 x 0.6 x 1.5 scale, so divide to get roughly 170 x 120 x 120 world half-extents.
-	ThreatContactZone->SetBoxExtent(FVector(57.f, 200.f, 80.f)); // Slightly wider and deeper than the wall itself.
+	// The zone inherits the mesh's 3 x 0.5 x 0.6 scale, so divide to get roughly 170 x 120 x 120 world half-extents.
+	ThreatContactZone->SetBoxExtent(FVector(57.f, 240.f, 200.f)); // Slightly longer and deeper than the wall itself.
 	ThreatContactZone->SetCollisionObjectType(ECC_GameTraceChannel1); // Reports as the Wall channel.
 	ThreatContactZone->SetCollisionResponseToAllChannels(ECR_Ignore); // Ignore everything...
 	ThreatContactZone->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Overlap); // ...except threats, which should trigger it.
@@ -58,15 +60,27 @@ void AWallActor::TakeThreatDamage(float Amount)
 	Breachable->ApplyDamage(Amount); // Pass the damage to the health component.
 }
 
-// Only a breached wall can be fixed; Safe or Threatened walls are left alone.
+// Only a breached wall can be fixed, and fixing costs one Patch kit.
 bool AWallActor::AttemptFix()
 {
-	if (Breachable->GetStatus() == EWallStatus::Breached) // Is there actually a breach to fix?
+	if (Breachable->GetStatus() != EWallStatus::Breached) // Is there actually a breach to fix?
 	{
-		Breachable->FullyRepair(); // Restore full health (this also cancels the countdown via the status event).
-		return true; // Tell the caller the fix worked.
+		return false; // Nothing was broken, so nothing was fixed.
 	}
-	return false; // Nothing was broken, so nothing was fixed.
+
+	AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this)); // Find our game mode.
+	if (GameMode && !GameMode->SpendResource(EResourceType::Patch, 1)) // Try to pay one Patch kit.
+	{
+		GameMode->PostAlert(TEXT("Not enough Patch kits to fix the wall. Clear the threats or collect more."), FColor::Orange); // Say why nothing happened.
+		return false; // Could not afford it.
+	}
+
+	Breachable->FullyRepair(); // Restore full health (this also cancels the countdown via the status event).
+	if (GameMode) // If there is a game mode to tell...
+	{
+		GameMode->RecordWallFixed(); // ...count the fix for the result screen.
+	}
+	return true; // Tell the caller the fix worked.
 }
 
 // Convenience passthrough to the Breachable component.

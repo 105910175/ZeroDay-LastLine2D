@@ -38,20 +38,23 @@ void ACityTaskActor::BeginPlay()
 	GraceTimer->OnExpired.AddDynamic(this, &ACityTaskActor::HandleGraceExpired); // Countdown over -> the task fails.
 }
 
-// Attending costs a resource. If the player can't pay, nothing happens.
+// Attending costs one of this station's resource. If the player can't pay, nothing happens.
 void ACityTaskActor::Attend()
 {
-	if (!bIsActiveThisLevel || bFailed) // Not in play, or already failed.
+	if (!bIsActiveThisLevel) // Not in play this level.
 	{
 		return; // Ignore the request.
 	}
 
 	if (AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this))) // Find our game mode.
 	{
-		if (!GameMode->SpendResource(1)) // Try to pay one resource.
+		const EResourceType Cost = ResourceForTask(TaskKind); // Food store -> Food, generator -> Power, tent -> Medical.
+		if (!GameMode->SpendResource(Cost, 1)) // Try to pay one.
 		{
+			GameMode->PostAlert(FString::Printf(TEXT("The %s station needs %s. Collect some first."), TaskKindToString(TaskKind), ResourceTypeToString(Cost)), FColor::Orange); // Say what is missing.
 			return; // Not enough resources.
 		}
+		GameMode->PostEffect(GetActorLocation(), FLinearColor::Green, 150.f, 0.6f); // Green ring shows the survivors were helped.
 	}
 
 	TaskComp->Attend(); // Paid up, so restore the station.
@@ -74,7 +77,6 @@ void ACityTaskActor::SetActiveThisLevel(bool bActive)
 // Puts the station back to a clean state for a fresh level.
 void ACityTaskActor::ResetForLevel(float DecayScale)
 {
-	bFailed = false; // Allow it to run (and fail) again.
 	GraceTimer->CancelCooldown(); // No leftover countdown.
 	TaskComp->ResetTask(DecayScale); // Full meter at the new level's decay speed.
 }
@@ -91,12 +93,12 @@ void ACityTaskActor::HandleAttended()
 	GraceTimer->CancelCooldown(); // Stop the countdown.
 }
 
-// Ran out of time while still critical: the task has failed.
+// Ran out of time while still critical: the task has failed and a survivor is lost.
 void ACityTaskActor::HandleGraceExpired()
 {
-	if (TaskComp->IsCritical() && !bFailed) // Still critical and not already failed?
+	if (TaskComp->IsCritical()) // Still critical when the countdown ended?
 	{
-		bFailed = true; // Latch so we only fail once.
-		OnTaskFailed.Broadcast(this); // Tell the game mode.
+		OnTaskFailed.Broadcast(this); // Tell the game mode (it removes a survivor).
+		TaskComp->RestoreCondition(50.f); // Give the station a partial second chance instead of leaving it dead.
 	}
 }

@@ -40,7 +40,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "CityTask")
 	FOnCityTaskFailed OnTaskFailed;
 
-	// Spends one resource and resets the task, if the player can afford it.
+	// Spends this station's resource (food, power cells or medical kits) and resets the task, if the player can afford it.
 	UFUNCTION(BlueprintCallable, Category = "CityTask")
 	void Attend();
 
@@ -83,6 +83,4 @@ private:
 	UFUNCTION()
 	void HandleGraceExpired();
 
-	// Latched once failed so the failure only fires once.
-	bool bFailed = false;
 };

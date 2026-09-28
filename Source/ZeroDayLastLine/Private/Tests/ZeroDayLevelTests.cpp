@@ -92,7 +92,10 @@ bool FZeroDayFullPlaythroughTest::RunTest(const FString& Parameters)
 		const FString Label = FString::Printf(TEXT("Level %d"), Level); // For readable failure messages.
 
 		TestEqual(*(Label + TEXT(": game mode is on this level")), Test.GameMode->CurrentLevel, Level); // Advancing worked.
-		TestEqual(*(Label + TEXT(": starting resources")), Test.GameMode->Resources, Rules.StartingResources); // Fresh pool.
+		TestEqual(*(Label + TEXT(": starting Intel")), Test.GameMode->GetResource(EResourceType::Intel), Rules.StartingIntel); // Fresh Intel.
+		TestEqual(*(Label + TEXT(": starting Patch kits")), Test.GameMode->GetResource(EResourceType::Patch), Rules.StartingPatch); // Fresh Patch kits.
+		TestEqual(*(Label + TEXT(": starting Food")), Test.GameMode->GetResource(EResourceType::Food), Rules.StartingFood); // Fresh Food.
+		TestEqual(*(Label + TEXT(": starting survivors")), Test.GameMode->GetSurvivors(), Rules.StartingSurvivors); // Everyone alive.
 
 		int32 ActiveWalls = 0; // Walls in play.
 		for (AWallActor* Wall : Test.GameMode->GetWalls()) // Check each wall.

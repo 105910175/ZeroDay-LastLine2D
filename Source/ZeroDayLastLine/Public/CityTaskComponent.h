@@ -42,6 +42,9 @@ public:
 	// Sets a new decay multiplier and puts the meter back to full, ready for a new level.
 	void ResetTask(float NewDecayScale);
 
+	// Puts the meter back to a given value (0-100) and clears the critical flag, keeping the decay speed.
+	void RestoreCondition(float NewCondition);
+
 	// Current condition, 0-100.
 	UFUNCTION(BlueprintPure, Category = "CityTask")
 	float GetCondition() const { return Condition; }

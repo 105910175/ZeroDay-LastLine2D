@@ -108,19 +108,23 @@ void AZeroDayGameMode::BuildDefaultLayout()
 		EWallSide Side; // Which wall this is.
 		FVector Direction; // Which way it lies from the centre.
 		float Distance; // How far from the centre.
+		float WallLength; // How long the wall is along the edge of the city.
 	};
+	constexpr float WallBaseLength = 300.f; // A wall is 300 units long before scaling (the mesh is 100 x 3).
+	constexpr float WallCoverage = 0.8f; // Each wall covers 80% of its side of the city, leaving gaps at the corners.
 	const FSideSetup Sides[] = {
-		{ EWallSide::North, Forward, CityHalfExtents.Y }, // Front wall.
-		{ EWallSide::South, -Forward, CityHalfExtents.Y }, // Back wall.
-		{ EWallSide::East, Right, CityHalfExtents.X }, // Right wall.
-		{ EWallSide::West, -Right, CityHalfExtents.X }, // Left wall.
+		{ EWallSide::North, Forward, CityHalfExtents.Y, 2.f * CityHalfExtents.X * WallCoverage }, // Front wall spans the width.
+		{ EWallSide::South, -Forward, CityHalfExtents.Y, 2.f * CityHalfExtents.X * WallCoverage }, // Back wall spans the width.
+		{ EWallSide::East, Right, CityHalfExtents.X, 2.f * CityHalfExtents.Y * WallCoverage }, // Right wall spans the depth.
+		{ EWallSide::West, -Right, CityHalfExtents.X, 2.f * CityHalfExtents.Y * WallCoverage }, // Left wall spans the depth.
 	};
 
 	for (const FSideSetup& Setup : Sides) // Create a wall and spawner for each side.
 	{
 		const FVector WallPosition = Centre + Setup.Direction * Setup.Distance; // Where the wall stands.
 		const FRotator WallRotation(0.f, Setup.Direction.Rotation().Yaw + 90.f, 0.f); // Turn it so its long side faces the centre.
-		AWallActor* Wall = World->SpawnActor<AWallActor>(AWallActor::StaticClass(), WallPosition, WallRotation, SpawnParams); // Build the wall.
+		const FTransform WallTransform(WallRotation, WallPosition, FVector(Setup.WallLength / WallBaseLength, 1.f, 1.f)); // Stretch only along the wall's long axis.
+		AWallActor* Wall = World->SpawnActor<AWallActor>(AWallActor::StaticClass(), WallTransform, SpawnParams); // Build the wall.
 		if (!Wall) // Spawn failed.
 		{
 			continue; // Skip this side.
@@ -210,7 +214,15 @@ void AZeroDayGameMode::StartLevel(int32 Level)
 		Spawner->SetSpawningEnabled(true); // Restart its timer with the new interval.
 	}
 
-	Resources = Config.StartingResources; // Fresh resource pool.
+	Inventory[static_cast<int32>(EResourceType::Intel)] = Config.StartingIntel; // Fresh Intel.
+	Inventory[static_cast<int32>(EResourceType::Patch)] = Config.StartingPatch; // Fresh Patch kits.
+	Inventory[static_cast<int32>(EResourceType::Food)] = Config.StartingFood; // Fresh Food.
+	Inventory[static_cast<int32>(EResourceType::Power)] = Config.StartingPower; // Fresh Power cells.
+	Inventory[static_cast<int32>(EResourceType::Medical)] = Config.StartingMedical; // Fresh Medical kits.
+	Survivors = Config.StartingSurvivors; // Everyone is alive at the start.
+	MaxSurvivors = Config.StartingSurvivors; // Remember how many there were for the HUD.
+	Stats = FZeroDayLevelStats(); // Clear the previous level's results.
+	Effects.Empty(); // Clear any rings still animating.
 	Alerts.Empty(); // Clear the previous level's messages.
 	EndMessage.Empty(); // No result yet.
 	bPlayerWon = false; // Not won yet.
@@ -256,14 +268,33 @@ void AZeroDayGameMode::AdvanceToNextLevel()
 	}
 }
 
-// All-or-nothing: never spends part of the cost.
-bool AZeroDayGameMode::SpendResource(int32 Amount)
+// How many of a resource the player is carrying.
+int32 AZeroDayGameMode::GetResource(EResourceType Type) const
 {
-	if (Resources < Amount) // Can the player afford it?
+	return Inventory[static_cast<int32>(Type)]; // Look it up by its enum index.
+}
+
+// True if the player has at least Amount of the resource.
+bool AZeroDayGameMode::CanAfford(EResourceType Type, int32 Amount) const
+{
+	return GetResource(Type) >= Amount; // Enough in the inventory?
+}
+
+// Adds resources, for example from a pickup.
+void AZeroDayGameMode::AddResource(EResourceType Type, int32 Amount)
+{
+	int32& Slot = Inventory[static_cast<int32>(Type)]; // The counter for this resource.
+	Slot = FMath::Max(0, Slot + Amount); // Add, but never go below zero.
+}
+
+// All-or-nothing: never spends part of the cost.
+bool AZeroDayGameMode::SpendResource(EResourceType Type, int32 Amount)
+{
+	if (!CanAfford(Type, Amount)) // Can the player afford it?
 	{
 		return false; // No, spend nothing.
 	}
-	Resources -= Amount; // Yes, pay the full cost.
+	Inventory[static_cast<int32>(Type)] -= Amount; // Yes, pay the full cost.
 	return true; // Tell the caller it worked.
 }
 
@@ -283,6 +314,35 @@ void AZeroDayGameMode::PostAlert(const FString& Message, const FColor& Color)
 	{
 		Alerts.RemoveAt(0); // Drop the oldest.
 	}
+}
+
+// Queues a ring for the HUD to draw, dropping any that have already finished.
+void AZeroDayGameMode::PostEffect(const FVector& Location, const FLinearColor& Color, float MaxRadius, float Duration)
+{
+	const float Now = GetWorld()->GetTimeSeconds(); // Current world time.
+	Effects.RemoveAll([Now](const FZeroDayEffect& Old) { return Now > Old.StartTime + Old.Duration; }); // Forget finished rings.
+
+	FZeroDayEffect Effect; // Build the new ring.
+	Effect.Location = Location; // Where it appears.
+	Effect.Color = Color; // What colour it is.
+	Effect.MaxRadius = MaxRadius; // How big it grows.
+	Effect.StartTime = Now; // When it began.
+	Effect.Duration = Duration; // How long it lasts.
+	Effects.Add(Effect); // Queue it for drawing.
+}
+
+// A threat was shot down: count real ones and show a small burst where it fell.
+void AZeroDayGameMode::OnThreatKilled(const AThreatPawn* Threat)
+{
+	if (!Threat || bGameEnded) // Nothing to record, or the level is over.
+	{
+		return; // Ignore.
+	}
+	if (!Threat->bIsDecoy) // False positives don't count as a real success.
+	{
+		++Stats.ThreatsStopped; // Count the real threat.
+	}
+	PostEffect(Threat->GetActorLocation(), FLinearColor(1.f, 0.75f, 0.3f), 70.f, 0.4f); // Same colour for everyone so it doesn't reveal severity.
 }
 
 // Seconds left to survive, for the HUD.
@@ -312,10 +372,12 @@ void AZeroDayGameMode::HandleWallStatusChanged(AWallActor* Wall, EWallStatus New
 		PostAlert(FString::Printf(TEXT("%s wall under attack (integrity %.0f%%)"), Side, Wall->GetHealthPercent() * 100.f), FColor::Orange);
 		break; // Done.
 	case EWallStatus::Breached: // Health reached zero.
-		PostAlert(FString::Printf(TEXT("%s wall BREACHED: fix it (E) or clear the threats!"), Side), FColor::Red);
+		PostAlert(FString::Printf(TEXT("%s wall BREACHED: fix it with a Patch (E) or clear the threats!"), Side), FColor(255, 105, 90));
+		PostEffect(Wall->GetActorLocation(), FLinearColor::Red, 260.f, 0.9f); // Big red ring on the broken wall.
 		break; // Done.
 	default: // Back to Safe after a repair.
 		PostAlert(FString::Printf(TEXT("%s wall secured"), Side), FColor::Green);
+		PostEffect(Wall->GetActorLocation(), FLinearColor::Green, 200.f, 0.7f); // Green ring on the repaired wall.
 		break; // Done.
 	}
 }
@@ -326,10 +388,27 @@ void AZeroDayGameMode::HandleWallLost(AWallActor* LostWall)
 	EndGame(false, FString::Printf(TEXT("The %s wall fell and the zero-day was weaponised."), LostWall ? WallSideToString(LostWall->WallSide) : TEXT("outer"))); // Name the wall in the result.
 }
 
-// A city station went unattended too long: lose.
+// A city station went unattended too long: a survivor is lost, and the level is lost if none remain.
 void AZeroDayGameMode::HandleTaskFailed(ACityTaskActor* FailedTask)
 {
-	EndGame(false, FString::Printf(TEXT("%s failed while you were busy elsewhere."), FailedTask ? TaskKindToString(FailedTask->TaskKind) : TEXT("A city station"))); // Name the station in the result.
+	if (bGameEnded) // The level is already over.
+	{
+		return; // Ignore.
+	}
+
+	Survivors = FMath::Max(0, Survivors - 1); // One fewer survivor (never below zero).
+	++Stats.SurvivorsLost; // Remember it for the result screen.
+	const TCHAR* StationName = FailedTask ? TaskKindToString(FailedTask->TaskKind) : TEXT("A station"); // Which station failed.
+	PostAlert(FString::Printf(TEXT("A survivor was lost: the %s station ran out. %d left."), StationName, Survivors), FColor(255, 105, 90)); // Tell the player.
+	if (FailedTask) // If we know where it happened...
+	{
+		PostEffect(FailedTask->GetActorLocation(), FLinearColor::Red, 180.f, 1.0f); // ...mark the spot with a red ring.
+	}
+
+	if (Survivors <= 0) // Nobody left?
+	{
+		EndGame(false, TEXT("The last survivor was lost because the city's stations were left to fail.")); // Lose the level.
+	}
 }
 
 // The level timer ran out with everything still standing: win.
@@ -368,7 +447,7 @@ void AZeroDayGameMode::HandleSurge()
 
 	AThreatSpawnerActor* Chosen = Candidates[FMath::RandRange(0, Candidates.Num() - 1)]; // Pick one at random.
 	Chosen->SpawnBurst(Config.SurgeThreatCount, EThreatSeverity::Critical); // Send the critical wave.
-	PostAlert(FString::Printf(TEXT("ZERO-DAY SURGE: critical exploits inbound on the %s wall!"), WallSideToString(Chosen->TargetWall->WallSide)), FColor::Red); // Warn the player.
+	PostAlert(FString::Printf(TEXT("ZERO-DAY SURGE: critical exploits inbound on the %s wall!"), WallSideToString(Chosen->TargetWall->WallSide)), FColor(255, 105, 90)); // Warn the player.
 }
 
 // Stops the timers and spawners and records the result for the HUD.

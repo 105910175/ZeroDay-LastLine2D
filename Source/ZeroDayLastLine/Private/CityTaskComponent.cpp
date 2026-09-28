@@ -43,6 +43,13 @@ void UCityTaskComponent::Attend()
 	OnAttended.Broadcast(); // Tell the station to cancel its grace timer.
 }
 
+// After a failure the station gets a second chance at a partial meter instead of staying dead.
+void UCityTaskComponent::RestoreCondition(float NewCondition)
+{
+	Condition = FMath::Clamp(NewCondition, 0.f, 100.f); // Keep the value within 0-100.
+	bIsCritical = Condition <= CriticalThreshold; // Still critical if restored to a low value.
+}
+
 // Used when a level starts: full meter, and the new level's decay speed.
 void UCityTaskComponent::ResetTask(float NewDecayScale)
 {
