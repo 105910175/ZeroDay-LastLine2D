@@ -1,30 +1,31 @@
-#pragma once
+#pragma once // Only include this header once per compilation unit.
 
-#include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
-#include "ZeroDayTypes.h"
-#include "WallActor.generated.h"
+#include "CoreMinimal.h" // Basic Unreal types.
+#include "GameFramework/Actor.h" // Base class for anything placed in the level.
+#include "ZeroDayTypes.h" // EWallSide, EWallStatus, EThreatSeverity.
+#include "WallActor.generated.h" // Unreal's generated reflection code (must be last include).
 
-class UBreachableComponent;
-class UCooldownComponent;
-class UStaticMeshComponent;
-class UBoxComponent;
-class AWallActor;
-class AThreatPawn;
+class UBreachableComponent; // Forward declaration: tracks health and status.
+class UCooldownComponent; // Forward declaration: the breach countdown timer.
+class UStaticMeshComponent; // Forward declaration: the solid wall body.
+class UBoxComponent; // Forward declaration: trigger volume for arriving threats.
+class AWallActor; // Forward declaration so the delegates below can name this class.
+class AThreatPawn; // Forward declaration: the attackers heading for this wall.
 
+// Fired when a wall stays breached until its countdown ends (a fail condition).
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWallLost, AWallActor*, LostWall);
+// Fired whenever a wall's status changes (Safe / Threatened / Breached).
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWallStatusUpdated, AWallActor*, Wall, EWallStatus, NewStatus);
 
-// One of the four city walls. Detect = Breachable's Threatened/Breached status.
-// Remediate = AttemptFix() (patch) or simply surviving the RemediationTimer window
-// by killing off the threats attacking it (contain).
-UCLASS()
-class ZERODAYLASTLINE_API AWallActor : public AActor
+// One of the four city walls. Detect = the Threatened/Breached status and scan markers.
+// Remediate = AttemptFix() (patch) or clearing the threats attacking it (contain).
+UCLASS() // Makes this class visible to Unreal's reflection system.
+class ZERODAYLASTLINE_API AWallActor : public AActor // Exported so other files can use it.
 {
-	GENERATED_BODY()
+	GENERATED_BODY() // Unreal boilerplate for reflected classes.
 
 public:
-	AWallActor();
+	AWallActor(); // Builds the mesh, trigger zone and components.
 
 	// Which side of the city this wall guards.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wall")
@@ -46,17 +47,17 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Wall")
 	FOnWallStatusUpdated OnStatusUpdated;
 
-	// Threats currently walking towards this wall. Threats register themselves when
-	// initialised and unregister when destroyed.
+	// Threats register themselves here when initialised and unregister when destroyed.
 	void RegisterInboundThreat(AThreatPawn* Threat);
 	void UnregisterInboundThreat(AThreatPawn* Threat);
 
+	// How many live threats are heading for this wall.
 	int32 GetInboundThreatCount() const;
 
 	// Number of inbound threats an Insta Scan has flagged / that Validate hasn't checked yet.
 	int32 GetDetectedThreatCount() const;
 	int32 GetUnvalidatedDetectedCount() const;
-	bool IsExposureDetected() const { return GetDetectedThreatCount() > 0; }
+	bool IsExposureDetected() const { return GetDetectedThreatCount() > 0; } // True if any inbound threat is flagged.
 
 	// Insta Scan: flags every inbound threat as detected. Returns how many there are.
 	int32 MarkInboundDetected();
@@ -64,6 +65,7 @@ public:
 	// Validate: reveals whether each detected threat is real or a false positive.
 	void ValidateInbound(int32& OutReal, int32& OutFalsePositives, EThreatSeverity& OutHighestSeverity);
 
+	// Wall health as a 0-1 fraction, for the HUD.
 	UFUNCTION(BlueprintPure, Category = "Wall")
 	float GetHealthPercent() const;
 
@@ -75,10 +77,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Wall")
 	void TakeThreatDamage(float Amount);
 
-	// The player's patch action: fully repairs the wall if it is breached.
+	// The player's patch action: fully repairs the wall if it is breached. Returns true if it fixed something.
 	UFUNCTION(BlueprintCallable, Category = "Wall")
-	void AttemptFix();
+	bool AttemptFix();
 
+	// Current Safe / Threatened / Breached status.
 	UFUNCTION(BlueprintPure, Category = "Wall")
 	EWallStatus GetStatus() const;
 
@@ -86,8 +89,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Wall")
 	void SetActiveThisLevel(bool bActive);
 
+	// Applies a level's rules to this wall (currently just the breach countdown length).
+	void ApplyLevelSettings(float NewRemediationWindowSeconds);
+
+	// Puts the wall back to full health with no breach countdown, ready for a fresh level.
+	void ResetForLevel();
+
 protected:
-	virtual void BeginPlay() override;
+	virtual void BeginPlay() override; // Binds the component events once everything exists.
 
 	// Visible, solid wall (blocks the player and threats).
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Wall")
@@ -109,12 +118,15 @@ private:
 	// Threats currently heading for this wall. Weak pointers so destroyed threats drop out safely.
 	TArray<TWeakObjectPtr<AThreatPawn>> InboundThreats;
 
+	// Reacts to the Breachable component changing status.
 	UFUNCTION()
 	void HandleStatusChanged(EWallStatus NewStatus);
 
+	// Reacts to the breach countdown running out.
 	UFUNCTION()
 	void HandleRemediationExpired();
 
+	// Reacts to something entering the threat trigger zone.
 	UFUNCTION()
 	void HandleThreatContactBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };

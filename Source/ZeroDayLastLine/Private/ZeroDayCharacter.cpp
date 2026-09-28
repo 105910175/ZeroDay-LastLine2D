@@ -177,11 +177,11 @@ void AZeroDayCharacter::RestartLevel()
 	}
 }
 
-// N: load the next level (only does anything after a win).
+// N: advance to the next level (only does anything after a win).
 void AZeroDayCharacter::NextLevel()
 {
 	if (AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this)))
 	{
-		GameMode->LoadNextLevel();
+		GameMode->AdvanceToNextLevel(); // Move on to the next level (only works after a win).
 	}
 }

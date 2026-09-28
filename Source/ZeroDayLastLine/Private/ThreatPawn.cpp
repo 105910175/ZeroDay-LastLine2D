@@ -1,122 +1,121 @@
-#include "ThreatPawn.h"
-#include "WallActor.h"
-#include "Components/SphereComponent.h"
-#include "Components/StaticMeshComponent.h"
-#include "UObject/ConstructorHelpers.h"
+#include "ThreatPawn.h" // This class's own declaration.
+#include "WallActor.h" // So the threat can hurt and unregister from its wall.
+#include "Components/SphereComponent.h" // The collision body.
+#include "Components/StaticMeshComponent.h" // The visible stand-in.
+#include "UObject/ConstructorHelpers.h" // Lets a constructor load engine assets.
 
 // Threat channel (GameTraceChannel2). Overlaps most things so shots can hit it, but blocks on wall meshes.
 AThreatPawn::AThreatPawn()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = true; // Threats move every frame.
 
-	HitSphere = CreateDefaultSubobject<USphereComponent>(TEXT("HitSphere"));
-	RootComponent = HitSphere;
-	HitSphere->SetSphereRadius(50.f);
-	HitSphere->SetCollisionObjectType(ECC_GameTraceChannel2); // Threat channel
-	HitSphere->SetCollisionResponseToAllChannels(ECR_Overlap);
-	HitSphere->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Block); // Physically stop at wall meshes
+	HitSphere = CreateDefaultSubobject<USphereComponent>(TEXT("HitSphere")); // Create the collision body.
+	RootComponent = HitSphere; // The sphere is the root that everything attaches to.
+	HitSphere->SetSphereRadius(50.f); // Fifty units is roughly body sized.
+	HitSphere->SetCollisionObjectType(ECC_GameTraceChannel2); // Report as the Threat channel.
+	HitSphere->SetCollisionResponseToAllChannels(ECR_Overlap); // Overlap most things so shots can hit it.
+	HitSphere->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Block); // But stop physically at wall meshes.
 
-	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
-	BodyMesh->SetupAttachment(RootComponent);
-	BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh")); // Create the visible body.
+	BodyMesh->SetupAttachment(RootComponent); // Attach it to the collision sphere.
+	BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // The mesh is only for looks.
 
 	// Blockout mesh: an upright cylinder reads as a humanoid silhouette better than a sphere.
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMeshAsset(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	if (CylinderMeshAsset.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMeshAsset(TEXT("/Engine/BasicShapes/Cylinder.Cylinder")); // Find the engine cylinder once.
+	if (CylinderMeshAsset.Succeeded()) // Only use it if it was found.
 	{
-		BodyMesh->SetStaticMesh(CylinderMeshAsset.Object);
+		BodyMesh->SetStaticMesh(CylinderMeshAsset.Object); // Show the cylinder.
 	}
-	BodyMesh->SetRelativeScale3D(FVector(0.4f, 0.4f, 1.0f));
-	BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, -50.f));
+	BodyMesh->SetRelativeScale3D(FVector(0.4f, 0.4f, 1.0f)); // Thin and tall.
+	BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, -50.f)); // Sit it so its base is at ground level.
 }
 
+// Nothing extra to do when the threat appears.
 void AThreatPawn::BeginPlay()
 {
-	Super::BeginPlay();
+	Super::BeginPlay(); // Let the base class finish starting up.
 }
 
 // Tell the wall this threat is gone so scans and validation stay accurate.
 void AThreatPawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (TargetWall)
+	if (TargetWall) // Only if we were heading for a wall.
 	{
-		TargetWall->UnregisterInboundThreat(this);
+		TargetWall->UnregisterInboundThreat(this); // Remove us from that wall's list.
 	}
-	Super::EndPlay(EndPlayReason);
+	Super::EndPlay(EndPlayReason); // Let the base class finish cleaning up.
 }
 
 // Applies the target, severity and decoy status, and scales stats to match.
-void AThreatPawn::InitialiseThreat(AWallActor* InTargetWall, EThreatSeverity InSeverity, bool bInIsDecoy)
+void AThreatPawn::InitialiseThreat(AWallActor* InTargetWall, EThreatSeverity InSeverity, bool bInIsDecoy, float SpeedScale, float HealthScale)
 {
-	TargetWall = InTargetWall;
-	Severity = InSeverity;
-	bIsDecoy = bInIsDecoy;
+	TargetWall = InTargetWall; // Remember which wall to attack.
+	Severity = InSeverity; // Remember how dangerous this threat is.
+	bIsDecoy = bInIsDecoy; // Remember whether it is a harmless false positive.
 
-	// Relative to the base ContactDamage/Health set on the class.
-	float DamageScale = 1.f;
-	float HealthScale = 1.f;
-	switch (Severity)
+	// Severity changes how hard it hits and how tough it is, relative to the base stats on the class.
+	float DamageScale = 1.f; // Multiplier for contact damage.
+	float SeverityHealthScale = 1.f; // Multiplier for health from severity.
+	switch (Severity) // Choose multipliers by severity.
 	{
-	case EThreatSeverity::Low:
-		DamageScale = 0.5f;
-		HealthScale = 0.7f;
-		break;
-	case EThreatSeverity::Critical:
-		DamageScale = 2.f;
-		HealthScale = 2.f;
-		break;
-	default:
-		break;
+	case EThreatSeverity::Low: // Weak threats.
+		DamageScale = 0.5f; // Half damage.
+		SeverityHealthScale = 0.7f; // Less health.
+		break; // Done with Low.
+	case EThreatSeverity::Critical: // Dangerous threats.
+		DamageScale = 2.f; // Double damage.
+		SeverityHealthScale = 2.f; // Double health.
+		break; // Done with Critical.
+	default: // Medium keeps the base stats.
+		break; // Nothing to change.
 	}
 
-	// False positives are harmless: they reach the wall but do no damage.
-	ContactDamage = bIsDecoy ? 0.f : ContactDamage * DamageScale;
-	Health *= HealthScale;
+	ContactDamage = bIsDecoy ? 0.f : ContactDamage * DamageScale; // False positives are harmless.
+	Health *= SeverityHealthScale * HealthScale; // Apply severity and level health scaling.
+	MoveSpeed *= SpeedScale; // Apply the level's speed scaling.
 
-	if (TargetWall)
+	if (TargetWall) // If we have a wall to attack...
 	{
-		TargetWall->RegisterInboundThreat(this);
+		TargetWall->RegisterInboundThreat(this); // ...let it know we are coming so scans can find us.
 	}
 }
 
 // Walks in a straight line at the target wall.
 void AThreatPawn::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+	Super::Tick(DeltaTime); // Run the base class tick first.
 
-	if (!TargetWall)
+	if (!TargetWall) // No target means nowhere to go.
 	{
-		return;
+		return; // Stand still.
 	}
 
-	const FVector ToTarget = TargetWall->GetActorLocation() - GetActorLocation();
-	// Ignore height so threats stay on the ground plane.
-	const FVector FlatDirection = FVector(ToTarget.X, ToTarget.Y, 0.f).GetSafeNormal();
+	const FVector ToTarget = TargetWall->GetActorLocation() - GetActorLocation(); // Vector from us to the wall.
+	const FVector FlatDirection = FVector(ToTarget.X, ToTarget.Y, 0.f).GetSafeNormal(); // Ignore height so threats stay on the ground plane.
 
-	if (!FlatDirection.IsNearlyZero())
+	if (!FlatDirection.IsNearlyZero()) // Only move if we have a direction.
 	{
-		// Sweep so the threat stops at solid walls instead of passing through.
-		AddActorWorldOffset(FlatDirection * MoveSpeed * DeltaTime, true);
-		SetActorRotation(FlatDirection.Rotation());
+		AddActorWorldOffset(FlatDirection * MoveSpeed * DeltaTime, true); // Sweep so the threat stops at solid walls instead of passing through.
+		SetActorRotation(FlatDirection.Rotation()); // Face the way we are walking.
 	}
 }
 
 // Called by projectiles. The threat is removed once its health runs out.
 void AThreatPawn::ApplyHitDamage(float Amount)
 {
-	Health -= Amount;
-	if (Health <= 0.f)
+	Health -= Amount; // Lose health.
+	if (Health <= 0.f) // Dead?
 	{
-		Destroy();
+		Destroy(); // Remove the threat from the world.
 	}
 }
 
 // Damages the wall (0 for false positives) and removes itself.
 void AThreatPawn::OnReachedTargetWall()
 {
-	if (TargetWall)
+	if (TargetWall) // Only if we still have a wall.
 	{
-		TargetWall->TakeThreatDamage(ContactDamage);
+		TargetWall->TakeThreatDamage(ContactDamage); // Hurt the wall (zero for decoys).
 	}
-	Destroy();
+	Destroy(); // The threat is used up once it arrives.
 }

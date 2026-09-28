@@ -93,7 +93,7 @@ void AZeroDayHUD::DrawTopBar(const AZeroDayGameMode& GameMode)
 	DrawRect(PanelColor, 0.f, 0.f, Canvas->SizeX, TopBarHeight);
 
 	UFont* Font = GEngine->GetMediumFont();
-	DrawText(FString::Printf(TEXT("LEVEL %d"), GameMode.CurrentLevel), TextColor, 12.f, 8.f, Font, 1.f, false);
+	DrawText(GameMode.GetLevelConfig().Title.ToUpper(), TextColor, 12.f, 8.f, Font, 1.f, false); // Level name, e.g. "LEVEL 2: VALIDATE".
 
 	const int32 SecondsLeft = FMath::CeilToInt(GameMode.GetLevelTimeRemaining());
 	const FString TimeText = FString::Printf(TEXT("Hold out: %d:%02d"), SecondsLeft / 60, SecondsLeft % 60);
@@ -296,14 +296,14 @@ void AZeroDayHUD::DrawControlsHint()
 void AZeroDayHUD::DrawObjectiveBanner(const AZeroDayGameMode& GameMode)
 {
 	// Only show the objective at the start of a level so it doesn't clutter play.
-	if (GetWorld()->GetTimeSeconds() > ObjectiveShowSeconds)
+	if (GameMode.GetTimeSinceLevelStart() > ObjectiveShowSeconds) // Measured from the start of this level, not the whole session.
 	{
 		return;
 	}
 
 	DrawRect(PanelColor, 0.f, Canvas->SizeY * 0.3f - 12.f, Canvas->SizeX, 72.f);
 	DrawCenteredText(TEXT("OBJECTIVE"), WarnColor, Canvas->SizeY * 0.3f - 4.f, 0.9f);
-	DrawCenteredText(GameMode.GetObjectiveText(), TextColor, Canvas->SizeY * 0.3f + 24.f, 0.95f);
+	DrawCenteredText(GameMode.GetLevelConfig().Objective, TextColor, Canvas->SizeY * 0.3f + 24.f, 0.95f); // Each level has its own objective text.
 }
 
 // Win/lose overlay with the reason and what to press next.
@@ -312,13 +312,18 @@ void AZeroDayHUD::DrawEndScreen(const AZeroDayGameMode& GameMode)
 	const bool bWon = GameMode.DidPlayerWin();
 
 	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.65f), 0.f, 0.f, Canvas->SizeX, Canvas->SizeY);
-	DrawCenteredText(bWon ? TEXT("CITY SAVED") : TEXT("CITY LOST"), bWon ? GoodColor : BadColor, Canvas->SizeY * 0.35f, 3.f);
+	const TCHAR* Headline = bWon ? (GameMode.IsFinalLevelComplete() ? TEXT("ALL LEVELS CLEARED") : TEXT("LEVEL COMPLETE")) : TEXT("CITY LOST"); // Pick the big title.
+	DrawCenteredText(Headline, bWon ? GoodColor : BadColor, Canvas->SizeY * 0.35f, 3.f);
 	DrawCenteredText(GameMode.GetEndMessage(), TextColor, Canvas->SizeY * 0.35f + 80.f, 1.1f);
 
 	FString Prompt = TEXT("Press R to try again");
-	if (GameMode.CanLoadNextLevel())
+	if (GameMode.CanAdvanceLevel()) // Won and there is another level to play.
 	{
-		Prompt = TEXT("Press N for the next level, or R to replay");
+		Prompt = FString::Printf(TEXT("Press N for %s, or R to replay"), *FZeroDayLevelConfig::ForLevel(GameMode.CurrentLevel + 1).Title); // Name the next level.
+	}
+	else if (GameMode.IsFinalLevelComplete()) // Won the last level.
+	{
+		Prompt = TEXT("Press R to play again");
 	}
 	DrawCenteredText(Prompt, MutedColor, Canvas->SizeY * 0.35f + 120.f, 1.f);
 }

@@ -1,29 +1,30 @@
-#pragma once
+#pragma once // Only include this header once per compilation unit.
 
-#include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
-#include "ThreatSpawnerActor.generated.h"
+#include "CoreMinimal.h" // Basic Unreal types.
+#include "GameFramework/Actor.h" // Base class for anything placed in the level.
+#include "ZeroDayTypes.h" // EThreatSeverity.
+#include "ThreatSpawnerActor.generated.h" // Unreal's generated reflection code (must be last include).
 
-class AThreatPawn;
-class AWallActor;
-class UCooldownComponent;
+class AThreatPawn; // Forward declaration: what gets spawned.
+class AWallActor; // Forward declaration: where spawned threats walk to.
+class UCooldownComponent; // Forward declaration: the spawn timer.
+struct FZeroDayLevelConfig; // Forward declaration: the level rules this spawner obeys.
 
-// Place one of these near each wall in the level and assign its TargetWall.
-// Uses the same UCooldownComponent as AWallActor/ACityTaskActor, looped, to
-// drive its spawn interval.
-UCLASS()
-class ZERODAYLASTLINE_API AThreatSpawnerActor : public AActor
+// One of these sits outside each wall and assigns its TargetWall. It uses the same
+// UCooldownComponent as the walls and stations, looped, to drive its spawn interval.
+UCLASS() // Makes this class visible to Unreal's reflection system.
+class ZERODAYLASTLINE_API AThreatSpawnerActor : public AActor // Exported so other files can use it.
 {
-	GENERATED_BODY()
+	GENERATED_BODY() // Unreal boilerplate for reflected classes.
 
 public:
-	AThreatSpawnerActor();
+	AThreatSpawnerActor(); // Builds the root and timer.
 
 	// Which threat class to spawn.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	TSubclassOf<AThreatPawn> ThreatClass;
 
-	// The wall spawned threats walk towards. Assign this in the level.
+	// The wall spawned threats walk towards.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	TObjectPtr<AWallActor> TargetWall;
 
@@ -46,20 +47,39 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner", meta = (ClampMin = "0", ClampMax = "1"))
 	float MediumChance = 0.35f;
 
+	// Multipliers the level applies to every threat this spawner creates.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
+	float ThreatSpeedScale = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
+	float ThreatHealthScale = 1.f;
+
+	// Starts a looping timer, or cancels it to stop spawning.
 	UFUNCTION(BlueprintCallable, Category = "Spawner")
 	void SetSpawningEnabled(bool bEnabled);
 
+	// Copies a level's difficulty settings onto this spawner.
+	void ApplyLevelConfig(const FZeroDayLevelConfig& Config);
+
+	// Spawns one threat with an exact severity and decoy flag. Returns true if it appeared.
+	bool SpawnThreat(EThreatSeverity Severity, bool bDecoy);
+
+	// Zero-day surge: spawns several real threats at once, ignoring the concurrency cap.
+	void SpawnBurst(int32 Count, EThreatSeverity Severity);
+
 protected:
-	virtual void BeginPlay() override;
+	virtual void BeginPlay() override; // Hooks up the timer when the game starts.
 
 	// Looping countdown that drives spawning.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawner")
 	TObjectPtr<UCooldownComponent> SpawnTimer;
 
 private:
+	// Runs each time the spawn timer expires.
 	UFUNCTION()
 	void HandleSpawnTick();
 
+	// Runs when any spawned threat is destroyed.
 	UFUNCTION()
 	void HandleSpawnedThreatDestroyed(AActor* DestroyedActor);
 
