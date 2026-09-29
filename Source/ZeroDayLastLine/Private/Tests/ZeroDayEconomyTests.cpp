@@ -193,7 +193,11 @@ bool FZeroDayValidateTest::RunTest(const FString& Parameters)
 		return false; // Stop early.
 	}
 
-	AZeroDayCharacter* Player = Test.World->SpawnActor<AZeroDayCharacter>(FVector::ZeroVector, FRotator::ZeroRotator); // The player, standing at the city centre.
+	// Standing close to the north wall, as if having walked up to defend it: the city is now
+	// large enough that Validate's range no longer reaches every wall from dead centre, which
+	// is the point (defending a wall means being at it, not sitting in the middle of the city).
+	const FVector PlayerSpawnLocation = North->GetActorLocation() - FVector(0.f, 300.f, 0.f);
+	AZeroDayCharacter* Player = Test.World->SpawnActor<AZeroDayCharacter>(PlayerSpawnLocation, FRotator::ZeroRotator);
 	UDetectionComponent* Detection = Player ? Player->FindComponentByClass<UDetectionComponent>() : nullptr; // Their scan and validate tools.
 	if (!TestNotNull(TEXT("The player has detection tools"), Detection)) // Needed for the rest.
 	{

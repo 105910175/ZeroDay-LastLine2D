@@ -65,12 +65,19 @@ public:
 	bool bAutoBuildLayout = true;
 
 	// Distance from the city centre to the side walls (X) and to the front/back walls (Y).
+	// Large enough that getting from a station to a wall is a real walk, not a step.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Layout")
-	FVector2D CityHalfExtents = FVector2D(850.f, 440.f);
+	FVector2D CityHalfExtents = FVector2D(1500.f, 950.f);
 
 	// How far outside each wall its threat spawner sits.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Layout")
-	float SpawnerDistanceBeyondWall = 600.f;
+	float SpawnerDistanceBeyondWall = 750.f;
+
+	// How far each North/South wall is extended past the corner, so it overlaps the East/West
+	// wall's end and the perimeter reads as one joined barrier instead of four separate strips
+	// with gaps at the corners.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Layout")
+	float WallCornerOverlap = 90.f;
 
 	// How many of a resource the player is carrying.
 	UFUNCTION(BlueprintPure, Category = "ZeroDay")

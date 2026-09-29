@@ -78,29 +78,48 @@ void UZeroDayDevDemo::RunNextStep()
 		}
 		SpawnAt(EWallSide::North, EThreatSeverity::Critical, false); SpawnAt(EWallSide::North, EThreatSeverity::Low, true); break; // Level 1: two threats arrive.
 	case 1: Shot(TEXT("01_level1_start")); break; // Objective banner and unscanned threats.
-	case 2: if (Detection) { Detection->PerformScan(); } break; // Insta Scan.
-	case 3: Shot(TEXT("02_level1_scanned")); break; // Scan ring and "?" markers.
-	case 4: if (Detection) { Detection->PerformValidate(); } break; // Validate.
-	case 5: Shot(TEXT("03_level1_validated")); break; // Severity and FALSE POSITIVE labels.
-	case 6: if (Player) { Player->SetActorRotation(FRotator(0.f, 90.f, 0.f)); } break; // Turn the character, as walking would.
-	case 7: // Did the camera turn with it?
+	case 2: // Walk the player up to the north wall, so a screenshot can show its actual size next to the player (the whole-city shots never get this close).
+		if (Player) // Should always exist by now.
+		{
+			for (AWallActor* Wall : GameMode->GetWalls()) // Find the north wall.
+			{
+				if (Wall && Wall->WallSide == EWallSide::North) // The one to stand next to.
+				{
+					// Approach along the direction from the player's own spawn point to the wall, rather than
+					// assuming a fixed world axis: the city's "forward" direction depends on the character's
+					// ForwardInputDirection (world +X in this game), not a fixed +Y.
+					const FVector ToWall = (Wall->GetActorLocation() - Player->GetActorLocation()).GetSafeNormal2D();
+					Player->SetActorLocation(Wall->GetActorLocation() - ToWall * 220.f); // Just inside the wall, close enough to read its art clearly.
+					break; // Done.
+				}
+			}
+		}
+		break;
+	case 3: Shot(TEXT("01b_wall_closeup")); break; // The wall's actual size and design next to the player.
+	case 4: if (Player) { Player->SetActorLocation(FVector::ZeroVector); } break; // Back to the city centre for the rest of the script.
+	case 5: if (Detection) { Detection->PerformScan(); } break; // Insta Scan.
+	case 6: Shot(TEXT("02_level1_scanned")); break; // Scan ring and "?" markers.
+	case 7: if (Detection) { Detection->PerformValidate(); } break; // Validate.
+	case 8: Shot(TEXT("03_level1_validated")); break; // Severity and FALSE POSITIVE labels.
+	case 9: if (Player) { Player->SetActorRotation(FRotator(0.f, 90.f, 0.f)); } break; // Turn the character, as walking would.
+	case 10: // Did the camera turn with it?
 		if (Player)
 		{
 			const UCameraComponent* Camera = Player->FindComponentByClass<UCameraComponent>(); // The player's camera.
 			UE_LOG(LogTemp, Display, TEXT("ZDDEMO after turning: rot=%s camRot=%s"), *Player->GetActorRotation().ToString(), Camera ? *Camera->GetComponentRotation().ToString() : TEXT("none")); // Log both.
 		}
 		Shot(TEXT("04_after_turn")); break; // The view after the turn.
-	case 8: if (Player) { Player->SetActorRotation(FRotator::ZeroRotator); } if (UFunction* Win = GameMode->FindFunction(TEXT("HandleLevelSurvived"))) { GameMode->ProcessEvent(Win, nullptr); } break; // Turn back, then end level 1 as a win.
-	case 9: Shot(TEXT("05_level1_complete")); break; // Level complete screen offering level 2.
-	case 10: GameMode->AdvanceToNextLevel(); break; // Press N.
-	case 11: SpawnAt(EWallSide::East, EThreatSeverity::Medium, false); SpawnAt(EWallSide::West, EThreatSeverity::Critical, false); SpawnAt(EWallSide::South, EThreatSeverity::Low, true); break; // Threats from several sides.
-	case 12: Shot(TEXT("06_level2_start")); break; // Level 2: all four walls.
-	case 13: GameMode->StartLevel(3); break; // Jump to level 3.
-	case 14: Shot(TEXT("07_level3_hud")); break; // Resources, survivors, stations, walls.
-	case 15: for (AWallActor* Wall : GameMode->GetWalls()) { if (Wall && Wall->WallSide == EWallSide::North) { Wall->TakeThreatDamage(1000.f); } } break; // Breach the north wall.
-	case 16: Shot(TEXT("08_level3_breach")); break; // Breach alert, countdown and red ring.
-	case 17: if (UFunction* Win = GameMode->FindFunction(TEXT("HandleLevelSurvived"))) { GameMode->ProcessEvent(Win, nullptr); } break; // Finish the last level (a win).
-	case 18: Shot(TEXT("09_all_levels_cleared")); break; // Final result screen.
+	case 11: if (Player) { Player->SetActorRotation(FRotator::ZeroRotator); } if (UFunction* Win = GameMode->FindFunction(TEXT("HandleLevelSurvived"))) { GameMode->ProcessEvent(Win, nullptr); } break; // Turn back, then end level 1 as a win.
+	case 12: Shot(TEXT("05_level1_complete")); break; // Level complete screen offering level 2.
+	case 13: GameMode->AdvanceToNextLevel(); break; // Press N.
+	case 14: SpawnAt(EWallSide::East, EThreatSeverity::Medium, false); SpawnAt(EWallSide::West, EThreatSeverity::Critical, false); SpawnAt(EWallSide::South, EThreatSeverity::Low, true); break; // Threats from several sides.
+	case 15: Shot(TEXT("06_level2_start")); break; // Level 2: all four walls.
+	case 16: GameMode->StartLevel(3); break; // Jump to level 3.
+	case 17: Shot(TEXT("07_level3_hud")); break; // Resources, survivors, stations, walls.
+	case 18: for (AWallActor* Wall : GameMode->GetWalls()) { if (Wall && Wall->WallSide == EWallSide::North) { Wall->TakeThreatDamage(1000.f); } } break; // Breach the north wall.
+	case 19: Shot(TEXT("08_level3_breach")); break; // Breach alert, countdown and red ring.
+	case 20: if (UFunction* Win = GameMode->FindFunction(TEXT("HandleLevelSurvived"))) { GameMode->ProcessEvent(Win, nullptr); } break; // Finish the last level (a win).
+	case 21: Shot(TEXT("09_all_levels_cleared")); break; // Final result screen.
 	default: FPlatformMisc::RequestExit(false); break; // Finished: quit the game.
 	}
 }

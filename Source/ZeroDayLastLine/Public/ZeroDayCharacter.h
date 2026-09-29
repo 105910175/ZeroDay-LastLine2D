@@ -28,6 +28,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Combat")
 	float InteractRange = 250.f;
 
+	// How much smaller than the Blueprint's default mesh size to show the player, applied in
+	// BeginPlay. The city and its walls are large; a smaller player reads better against them
+	// and makes the walls look like the solid barriers they are meant to be.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Movement")
+	float PlayerVisualScale = 0.65f;
+
 	// World directions the W/S and D/A keys move along. The camera never rotates, so these
 	// are fixed screen directions: W is up the screen (+X) and D is right (+Y).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroDay|Movement")

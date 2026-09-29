@@ -106,6 +106,27 @@ AZeroDayHUD::AZeroDayHUD()
 	{
 		SurvivorIcon = SurvivorFinder.Object; // Remember it.
 	}
+
+	static ConstructorHelpers::FObjectFinder<UTexture2D> WallFinder(TEXT("/Game/Sprites/T_wall_intact.T_wall_intact")); // A wall tile, reused as a small icon.
+	if (WallFinder.Succeeded()) // Found it.
+	{
+		WallIcon = WallFinder.Object; // Remember it.
+	}
+
+	static const TCHAR* StationIconPaths[3] = { // In ECityTaskKind order (Power, Food, Medic).
+		TEXT("/Game/Sprites/T_station_power.T_station_power"),
+		TEXT("/Game/Sprites/T_station_food.T_station_food"),
+		TEXT("/Game/Sprites/T_station_medical.T_station_medical"),
+	};
+	StationIcons.SetNum(3); // One slot per station kind.
+	for (int32 Index = 0; Index < 3; ++Index) // Load each icon.
+	{
+		ConstructorHelpers::FObjectFinder<UTexture2D> Finder(StationIconPaths[Index]); // Look it up.
+		if (Finder.Succeeded()) // Found it.
+		{
+			StationIcons[Index] = Finder.Object; // Remember it.
+		}
+	}
 }
 
 // Called by the engine every frame. Draw order matters: world markers first so the panels sit on top.
@@ -170,11 +191,63 @@ void AZeroDayHUD::DrawRing(float CenterX, float CenterY, float Radius, const FLi
 	}
 }
 
-// An empty bar with a coloured fill drawn on top of it.
+// An empty bar with a coloured fill drawn on top of it, styled as a segmented gauge.
 void AZeroDayHUD::DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& FillColor)
 {
+	const float ClampedFraction = FMath::Clamp(Fraction, 0.f, 1.f); // Never overflow or go negative.
 	DrawRect(BarBackground, X, Y, Width, Height); // The empty track.
-	DrawRect(FillColor, X, Y, Width * FMath::Clamp(Fraction, 0.f, 1.f), Height); // The filled part.
+	DrawRect(FillColor, X, Y, Width * ClampedFraction, Height); // The filled part.
+
+	constexpr int32 Segments = 10; // How many gauge divisions to draw.
+	for (int32 Index = 1; Index < Segments; ++Index) // Skip the two ends; only the internal dividers are drawn.
+	{
+		const float TickX = X + Width * (static_cast<float>(Index) / Segments); // Evenly spaced.
+		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.35f), TickX, Y, 1.f, Height); // A thin dark divider.
+	}
+	if (ClampedFraction > 0.f && ClampedFraction < 1.f) // Only meaningful while the bar is partially filled.
+	{
+		DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.8f), X + Width * ClampedFraction - 1.f, Y, 2.f, Height); // A bright cap at the fill's leading edge.
+	}
+}
+
+// A themed panel background: dark fill, a thin accent border and small corner brackets, so it
+// reads as a piece of interface rather than a plain rectangle.
+void AZeroDayHUD::DrawPanelFrame(float X, float Y, float Width, float Height, const FLinearColor& Accent)
+{
+	DrawRect(PanelColor, X, Y, Width, Height); // Dark translucent fill, same as before.
+
+	const FLinearColor Border(Accent.R, Accent.G, Accent.B, 0.45f); // A faint version of the accent for the full border.
+	DrawRect(Border, X, Y, Width, 2.f); // Top edge.
+	DrawRect(Border, X, Y + Height - 2.f, Width, 2.f); // Bottom edge.
+	DrawRect(Border, X, Y, 2.f, Height); // Left edge.
+	DrawRect(Border, X + Width - 2.f, Y, 2.f, Height); // Right edge.
+
+	// Small L-shaped brackets at each corner, in a brighter version of the accent colour, like a
+	// viewfinder reticle. Purely decorative, but it is what makes a panel look designed.
+	constexpr float BracketLength = 14.f;
+	constexpr float BracketThickness = 3.f;
+	const FLinearColor Bracket(Accent.R, Accent.G, Accent.B, 0.95f);
+	DrawRect(Bracket, X - 1.f, Y - 1.f, BracketLength, BracketThickness); // Top-left, horizontal leg.
+	DrawRect(Bracket, X - 1.f, Y - 1.f, BracketThickness, BracketLength); // Top-left, vertical leg.
+	DrawRect(Bracket, X + Width + 1.f - BracketLength, Y - 1.f, BracketLength, BracketThickness); // Top-right, horizontal leg.
+	DrawRect(Bracket, X + Width - BracketThickness + 1.f, Y - 1.f, BracketThickness, BracketLength); // Top-right, vertical leg.
+	DrawRect(Bracket, X - 1.f, Y + Height - BracketThickness + 1.f, BracketLength, BracketThickness); // Bottom-left, horizontal leg.
+	DrawRect(Bracket, X - 1.f, Y + Height + 1.f - BracketLength, BracketThickness, BracketLength); // Bottom-left, vertical leg.
+	DrawRect(Bracket, X + Width + 1.f - BracketLength, Y + Height - BracketThickness + 1.f, BracketLength, BracketThickness); // Bottom-right, horizontal leg.
+	DrawRect(Bracket, X + Width - BracketThickness + 1.f, Y + Height + 1.f - BracketLength, BracketThickness, BracketLength); // Bottom-right, vertical leg.
+}
+
+// Part of a ring, swept clockwise from 12 o'clock, covering Fraction of a full circle.
+void AZeroDayHUD::DrawArc(float CenterX, float CenterY, float Radius, float Fraction, const FLinearColor& Color, float Thickness)
+{
+	constexpr int32 TotalSegments = 40; // Segments in a full circle; more would look smoother but cost more draw calls.
+	const int32 DrawnSegments = FMath::Clamp(FMath::RoundToInt(TotalSegments * FMath::Clamp(Fraction, 0.f, 1.f)), 0, TotalSegments); // How much of the ring to actually draw.
+	for (int32 Index = 0; Index < DrawnSegments; ++Index) // One straight line per segment.
+	{
+		const float AngleA = -HALF_PI + 2.f * PI * static_cast<float>(Index) / TotalSegments; // Start angle of this segment (12 o'clock is -90 degrees).
+		const float AngleB = -HALF_PI + 2.f * PI * static_cast<float>(Index + 1) / TotalSegments; // End angle of this segment.
+		DrawLine(CenterX + FMath::Cos(AngleA) * Radius, CenterY + FMath::Sin(AngleA) * Radius, CenterX + FMath::Cos(AngleB) * Radius, CenterY + FMath::Sin(AngleB) * Radius, Color, Thickness); // Join the two points.
+	}
 }
 
 // A coloured tile with the resource's initial letter on it.
@@ -193,14 +266,30 @@ void AZeroDayHUD::DrawResourceIcon(EResourceType Type, float X, float Y, float S
 // Level name, time left to hold out, and (on levels with stations) the survivors.
 void AZeroDayHUD::DrawTopBar(const AZeroDayGameMode& GameMode)
 {
-	DrawRect(PanelColor, 0.f, 0.f, Canvas->SizeX, TopBarHeight); // Background strip across the top.
+	DrawPanelFrame(0.f, 0.f, Canvas->SizeX, TopBarHeight, FLinearColor(0.3f, 0.8f, 1.f)); // Framed strip across the top, cyan accent.
 
 	UFont* Font = GEngine->GetMediumFont(); // The font used for all HUD text.
 	DrawText(GameMode.GetLevelConfig().Title.ToUpper(), TextColor, 12.f, 8.f, Font, 1.f, false); // Level name, e.g. "LEVEL 2: VALIDATE".
 
 	const int32 SecondsLeft = FMath::CeilToInt(GameMode.GetLevelTimeRemaining()); // Whole seconds remaining.
+	const bool bTimeCritical = SecondsLeft <= 15; // The last fifteen seconds get extra emphasis.
 	const FString TimeText = FString::Printf(TEXT("Hold out: %d:%02d"), SecondsLeft / 60, SecondsLeft % 60); // Minutes:seconds.
-	DrawCenteredText(TimeText, SecondsLeft <= 15 ? WarnColor : TextColor, 8.f); // Turns amber for the last fifteen seconds.
+	float TimeAlpha = 1.f; // Solid unless it needs to pulse.
+	float TimeScale = 1.f; // Normal size unless it needs to stand out.
+	if (bTimeCritical) // Draw the eye with a pulse and a slightly bigger size.
+	{
+		TimeAlpha = 0.6f + 0.4f * FMath::Sin(GetWorld()->GetTimeSeconds() * 8.f); // Oscillates between 0.2 and 1.0.
+		TimeScale = 1.15f; // A little larger so it reads as urgent.
+	}
+	FLinearColor TimeColor = bTimeCritical ? BadColor : TextColor; // Amber/red once critical.
+	TimeColor.A = TimeAlpha; // Apply the pulse.
+	DrawCenteredText(TimeText, TimeColor, bTimeCritical ? 5.f : 8.f, TimeScale); // Turns red and pulses for the last fifteen seconds.
+
+	// A thin progress strip along the bottom of the bar, counting down the level like a loading bar.
+	const float DurationSeconds = FMath::Max(1.f, GameMode.GetLevelConfig().DurationSeconds); // Avoid dividing by zero.
+	const float TimeFraction = FMath::Clamp(GameMode.GetLevelTimeRemaining() / DurationSeconds, 0.f, 1.f); // 1 at the start, 0 at the end.
+	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.4f), 0.f, TopBarHeight - 3.f, Canvas->SizeX, 3.f); // Empty track.
+	DrawRect(bTimeCritical ? BadColor : GoodColor, 0.f, TopBarHeight - 3.f, Canvas->SizeX * TimeFraction, 3.f); // Shrinks as the level runs down.
 
 	if (GameMode.GetLevelConfig().bTasksActive) // Survivors only matter when stations can fail.
 	{
@@ -240,7 +329,7 @@ void AZeroDayHUD::DrawResourcePanel(const AZeroDayGameMode& GameMode)
 	constexpr float PanelWidth = 220.f; // Width of the panel.
 	const float PanelX = Canvas->SizeX - PanelWidth - 12.f; // Sit against the right edge.
 	const float PanelY = TopBarHeight + 10.f; // Just under the top bar.
-	DrawRect(PanelColor, PanelX, PanelY, PanelWidth, RowCount * RowHeight + 12.f); // Panel background.
+	DrawPanelFrame(PanelX, PanelY, PanelWidth, RowCount * RowHeight + 12.f, FLinearColor(1.f, 0.75f, 0.3f)); // Framed panel, amber accent (matches the resource theme).
 
 	float Y = PanelY + 8.f; // Top of the first row.
 	for (int32 Index = 0; Index < RowCount; ++Index) // One row per visible resource.
@@ -280,7 +369,9 @@ void AZeroDayHUD::DrawStatusPanel(const AZeroDayGameMode& GameMode)
 	}
 
 	const float PanelY = TopBarHeight + 10.f; // Just under the top bar.
-	DrawRect(PanelColor, PanelX, PanelY, PanelWidth, Rows * RowHeight + 12.f); // Panel background.
+	DrawPanelFrame(PanelX, PanelY, PanelWidth, Rows * RowHeight + 12.f, FLinearColor(0.3f, 0.8f, 1.f)); // Framed panel, cyan accent.
+
+	constexpr float RowIconSize = 16.f; // Small icon shown before each row's label.
 
 	float Y = PanelY + 8.f; // Top of the first row.
 	for (const AWallActor* Wall : GameMode.GetWalls()) // Wall rows.
@@ -290,8 +381,12 @@ void AZeroDayHUD::DrawStatusPanel(const AZeroDayGameMode& GameMode)
 			continue; // Next wall.
 		}
 
+		if (WallIcon) // Show the wall tile as a small icon if we have it.
+		{
+			DrawTexture(WallIcon, PanelX + 8.f, Y + 1.f, RowIconSize, RowIconSize, 0.f, 0.f, 1.f, 1.f, FLinearColor::White, BLEND_Translucent);
+		}
 		const float Health = Wall->GetHealthPercent(); // 0-1 health.
-		DrawText(FString::Printf(TEXT("%s wall"), WallSideToString(Wall->WallSide)), TextColor, PanelX + 8.f, Y, Font, 0.85f, false); // "North wall".
+		DrawText(FString::Printf(TEXT("%s wall"), WallSideToString(Wall->WallSide)), TextColor, PanelX + 8.f + RowIconSize + 4.f, Y, Font, 0.85f, false); // "North wall".
 		DrawBar(PanelX + LabelWidth, Y + 3.f, BarWidth, 12.f, Health, HealthColor(Health)); // Health bar.
 
 		FString StatusText = TEXT("Secure"); // Default status.
@@ -319,7 +414,12 @@ void AZeroDayHUD::DrawStatusPanel(const AZeroDayGameMode& GameMode)
 
 		const float Condition = Task->GetCondition() / 100.f; // 0-1 condition.
 		const EResourceType Need = ResourceForTask(Task->TaskKind); // What it costs to help.
-		DrawText(TaskKindToString(Task->TaskKind), TextColor, PanelX + 8.f, Y, Font, 0.85f, false); // Station name.
+		UTexture2D* StationIcon = StationIcons.IsValidIndex(static_cast<int32>(Task->TaskKind)) ? StationIcons[static_cast<int32>(Task->TaskKind)].Get() : nullptr; // This station's picture, if loaded.
+		if (StationIcon) // Show it as a small icon if we have it.
+		{
+			DrawTexture(StationIcon, PanelX + 8.f, Y + 1.f, RowIconSize, RowIconSize, 0.f, 0.f, 1.f, 1.f, FLinearColor::White, BLEND_Translucent);
+		}
+		DrawText(TaskKindToString(Task->TaskKind), TextColor, PanelX + 8.f + RowIconSize + 4.f, Y, Font, 0.85f, false); // Station name.
 		DrawBar(PanelX + LabelWidth, Y + 3.f, BarWidth, 12.f, Condition, HealthColor(Condition)); // Condition bar.
 		const bool bCritical = Condition <= 0.25f; // Nearly failed?
 		const FString StatusText = bCritical ? FString::Printf(TEXT("NEEDS %s!"), *FString(ResourceTypeToString(Need)).ToUpper()) : FString(TEXT("Running")); // Tell the player what to bring.
@@ -474,7 +574,8 @@ void AZeroDayHUD::DrawAlerts(const AZeroDayGameMode& GameMode)
 		float TextHeight = 0.f; // Filled in by GetTextSize.
 		GetTextSize(Alert.Message, TextWidth, TextHeight, Font, 0.9f); // Measure the message so the backing fits it.
 		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f * Color.A), 10.f, Y - 2.f, TextWidth + 12.f, LineHeight); // Dark backing so the text is readable over the map.
-		DrawText(Alert.Message, Color, 16.f, Y, Font, 0.9f, false); // Draw the message.
+		DrawRect(FLinearColor(Color.R, Color.G, Color.B, Color.A), 10.f, Y - 2.f, 3.f, LineHeight); // A coloured stripe down the left edge, like a notification card.
+		DrawText(Alert.Message, Color, 20.f, Y, Font, 0.9f, false); // Draw the message, nudged right of the stripe.
 		Y -= LineHeight; // Move up for the next (older) message.
 	}
 }
@@ -483,21 +584,32 @@ void AZeroDayHUD::DrawAlerts(const AZeroDayGameMode& GameMode)
 void AZeroDayHUD::DrawControlsHint()
 {
 	FString ScanText = TEXT("Q Insta Scan: ready"); // Default text.
+	float ScanFraction = 1.f; // Fraction of the cooldown that has recharged (1 = ready).
+	const UDetectionComponent* Detection = nullptr; // Found below if the player has one.
 	if (const APawn* Pawn = GetOwningPawn()) // Find the player's pawn.
 	{
-		if (const UDetectionComponent* Detection = Pawn->FindComponentByClass<UDetectionComponent>()) // Find its detection tools.
+		Detection = Pawn->FindComponentByClass<UDetectionComponent>(); // Its detection tools.
+	}
+	if (Detection) // We found the player's scan tool.
+	{
+		const float Cooldown = Detection->GetScanCooldownRemaining(); // Seconds until the next scan.
+		if (Cooldown > 0.f) // Still recharging?
 		{
-			const float Cooldown = Detection->GetScanCooldownRemaining(); // Seconds until the next scan.
-			if (Cooldown > 0.f) // Still recharging?
-			{
-				ScanText = FString::Printf(TEXT("Q Insta Scan: %.0fs"), Cooldown); // Show the wait.
-			}
+			ScanText = FString::Printf(TEXT("Q Insta Scan: %.0fs"), Cooldown); // Show the wait.
+			ScanFraction = 1.f - FMath::Clamp(Cooldown / FMath::Max(0.01f, Detection->ScanCooldownSeconds), 0.f, 1.f); // How much of the cooldown has passed.
 		}
 	}
 
 	const FString Hint = FString::Printf(TEXT("WASD move   Click shoot   %s   F Validate   E Fix / Feed / Repair   R Restart"), *ScanText); // The full hint line.
-	DrawRect(PanelColor, 0.f, Canvas->SizeY - 34.f, Canvas->SizeX, 34.f); // Background strip along the bottom.
+	const float BarY = Canvas->SizeY - 34.f; // Top of the bottom strip.
+	DrawPanelFrame(0.f, BarY, Canvas->SizeX, 34.f, FLinearColor(0.5f, 0.55f, 0.6f)); // Framed strip along the bottom, muted steel accent.
 	DrawCenteredText(Hint, MutedColor, Canvas->SizeY - 27.f, 0.85f); // Centred text.
+
+	// A small radial dial to the left of the hint text showing the Insta Scan cooldown at a glance.
+	const float DialX = Canvas->SizeX * 0.5f - 260.f; // Roughly where the hint text's "Q Insta Scan" starts.
+	const float DialY = BarY + 17.f; // Vertically centred in the strip.
+	DrawArc(DialX, DialY, 9.f, 1.f, FLinearColor(1.f, 1.f, 1.f, 0.15f), 2.f); // Faint full backing ring.
+	DrawArc(DialX, DialY, 9.f, ScanFraction, ScanFraction >= 1.f ? GoodColor : WarnColor, 2.f); // Fills up as it recharges.
 }
 
 // Start-of-level objective, so a first-time player knows what to do.
@@ -510,7 +622,7 @@ void AZeroDayHUD::DrawObjectiveBanner(const AZeroDayGameMode& GameMode)
 	}
 
 	const float BannerY = Canvas->SizeY * 0.62f; // Low on the screen so it never covers the status panels at the top.
-	DrawRect(PanelColor, 0.f, BannerY - 12.f, Canvas->SizeX, 72.f); // Dark strip behind the text.
+	DrawPanelFrame(0.f, BannerY - 12.f, Canvas->SizeX, 72.f, WarnColor); // Framed strip behind the text, amber accent.
 	DrawCenteredText(TEXT("OBJECTIVE"), WarnColor, BannerY - 4.f, 0.9f); // Heading.
 	DrawCenteredText(GameMode.GetLevelConfig().Objective, TextColor, BannerY + 24.f, 0.95f); // Each level has its own objective text.
 }
@@ -524,12 +636,24 @@ void AZeroDayHUD::DrawEndScreen(const AZeroDayGameMode& GameMode)
 	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.7f), 0.f, 0.f, Canvas->SizeX, Canvas->SizeY); // Darken the whole screen.
 
 	const TCHAR* Headline = bWon ? (GameMode.IsFinalLevelComplete() ? TEXT("ALL LEVELS CLEARED") : TEXT("LEVEL COMPLETE")) : TEXT("CITY LOST"); // Pick the big title.
+	const FLinearColor ResultAccent = bWon ? GoodColor : BadColor; // Green for a win, red for a loss; used throughout this screen.
 	const float Top = Canvas->SizeY * 0.28f; // Where the content starts.
-	DrawCenteredText(Headline, bWon ? GoodColor : BadColor, Top, 3.f); // The headline.
+	DrawCenteredText(Headline, ResultAccent, Top, 3.f); // The headline.
+
+	// A thin divider under the headline, centred and no wider than the space the results need.
+	constexpr float DividerWidth = 260.f;
+	DrawRect(FLinearColor(ResultAccent.R, ResultAccent.G, ResultAccent.B, 0.6f), (Canvas->SizeX - DividerWidth) * 0.5f, Top + 52.f, DividerWidth, 2.f);
+
 	DrawCenteredText(GameMode.GetEndMessage(), TextColor, Top + 80.f, 1.1f); // Why it ended.
 
-	// A short results list so the player sees what their choices achieved.
-	float Y = Top + 130.f; // First results line.
+	// A short results list so the player sees what their choices achieved, inside its own framed panel.
+	constexpr float StatsPanelWidth = 420.f;
+	const int32 StatRows = 4 + (GameMode.GetLevelConfig().bTasksActive ? 1 : 0); // Survivors row only appears with stations.
+	const float StatsPanelHeight = StatRows * 28.f + 20.f;
+	const float StatsPanelY = Top + 118.f;
+	DrawPanelFrame((Canvas->SizeX - StatsPanelWidth) * 0.5f, StatsPanelY, StatsPanelWidth, StatsPanelHeight, ResultAccent);
+
+	float Y = StatsPanelY + 14.f; // First results line, inside the panel.
 	DrawCenteredText(FString::Printf(TEXT("Threats stopped: %d"), Stats.ThreatsStopped), TextColor, Y, 1.f); // Real threats shot.
 	Y += 28.f; // Next line.
 	DrawCenteredText(FString::Printf(TEXT("False positives identified: %d"), Stats.FalsePositivesIdentified), TextColor, Y, 1.f); // Decoys exposed by Validate.
@@ -542,6 +666,7 @@ void AZeroDayHUD::DrawEndScreen(const AZeroDayGameMode& GameMode)
 		Y += 28.f; // Next line.
 		DrawCenteredText(FString::Printf(TEXT("Survivors saved: %d of %d"), GameMode.GetSurvivors(), GameMode.GetMaxSurvivors()), Stats.SurvivorsLost > 0 ? WarnColor : GoodColor, Y, 1.f); // How many lived.
 	}
+	Y = StatsPanelY + StatsPanelHeight; // Below the panel, for the prompt that follows.
 
 	FString Prompt = TEXT("Press R to try again"); // Default after losing.
 	if (GameMode.CanAdvanceLevel()) // Won and there is another level to play.

@@ -9,6 +9,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
 
@@ -29,7 +30,7 @@ AZeroDayCharacter::AZeroDayCharacter()
 	// Top-down camera on a boom that doesn't collide with the level.
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 1200.f;
+	CameraBoom->TargetArmLength = 1650.f; // Pulled back further so the larger city (bigger walls, more room to walk) still fits on screen.
 	CameraBoom->SetUsingAbsoluteRotation(true); // Keep the camera fixed in the world. Without this it turns whenever the character turns to face its movement.
 	CameraBoom->SetRelativeRotation(FRotator(-70.f, 0.f, 0.f)); // With absolute rotation this is a fixed world angle: looking down, screen-up is world +X.
 	CameraBoom->bDoCollisionTest = false;
@@ -55,6 +56,20 @@ void AZeroDayCharacter::BeginPlay()
 	{
 		PC->bShowMouseCursor = true;
 		PC->SetInputMode(FInputModeGameAndUI());
+	}
+
+	// Shrink the player relative to whatever mesh the Blueprint set up, so they read as
+	// human-sized against the much larger walls and stations. Done here (rather than the
+	// constructor) so it applies no matter what the Blueprint's construction script sets.
+	if (USkeletalMeshComponent* CharacterMesh = GetMesh())
+	{
+		const FVector OriginalMeshLocation = CharacterMesh->GetRelativeLocation(); // The Blueprint's own ground-alignment offset (usually a negative Z so the feet touch the floor).
+		CharacterMesh->SetRelativeScale3D(FVector(PlayerVisualScale)); // Shrink the visible mesh uniformly.
+		CharacterMesh->SetRelativeLocation(FVector(OriginalMeshLocation.X, OriginalMeshLocation.Y, OriginalMeshLocation.Z * PlayerVisualScale)); // Scale the ground offset too, so the feet still meet the floor instead of floating or sinking.
+	}
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCapsuleSize(Capsule->GetUnscaledCapsuleRadius() * PlayerVisualScale, Capsule->GetUnscaledCapsuleHalfHeight() * PlayerVisualScale); // Shrink collision to match, so the smaller player doesn't still bump things at the old size.
 	}
 }
 
@@ -149,7 +164,7 @@ void AZeroDayCharacter::Interact()
 	for (AActor* Actor : NearbyWalls)
 	{
 		AWallActor* Wall = Cast<AWallActor>(Actor);
-		if (Wall && FVector::Dist(Wall->GetActorLocation(), GetActorLocation()) <= InteractRange)
+		if (Wall && Wall->GetDistanceToPoint(GetActorLocation()) <= InteractRange) // Nearest point on the wall, not its (possibly distant) centre.
 		{
 			Wall->AttemptFix();
 			return;

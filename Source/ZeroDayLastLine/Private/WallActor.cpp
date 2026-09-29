@@ -17,8 +17,8 @@ namespace // Only this file uses these.
 {
 	constexpr float TileArtWidth = 256.f; // Each artwork tile is 256 pixels (= units) wide.
 	constexpr float WallBodyHeight = 60.f; // How tall the invisible collision body is.
-	constexpr float WallBodyDepth = 50.f; // How thick the invisible collision body is.
-	constexpr float ContactZoneHalfDepth = 120.f; // How far in front of/behind the wall a threat counts as arriving.
+	constexpr float WallBodyDepth = 96.f; // How thick the invisible collision body is (matches the 104px-tall artwork with its reinforced footing, so the wall reads as a solid barrier next to the player).
+	constexpr float ContactZoneHalfDepth = 160.f; // How far in front of/behind the wall a threat counts as arriving.
 }
 
 // Builds the wall: a solid body, a trigger zone for arriving threats, the artwork and the shared components.
@@ -67,6 +67,18 @@ AWallActor::AWallActor()
 		bHasSprites = true; // We will draw sprite tiles.
 		WallMesh->SetVisibility(false); // Hide the blockout body but keep its collision.
 	}
+
+	// A fixed pool of tile components, created here so they exist on the CDO like every other
+	// sprite in the game. RebuildVisuals() only shows/hides and repositions them; it never
+	// creates or destroys components at runtime.
+	SpriteTiles.Reserve(MaxWallTiles); // Avoid reallocating as we add them below.
+	for (int32 Index = 0; Index < MaxWallTiles; ++Index) // Enough tiles for the longest wall we build.
+	{
+		UPaperSpriteComponent* Tile = CreateDefaultSubobject<UPaperSpriteComponent>(*FString::Printf(TEXT("SpriteTile%d"), Index)); // Each needs a unique name.
+		Tile->SetupAttachment(WallRoot); // Attach it to the root.
+		Tile->SetVisibility(false); // Hidden until RebuildVisuals sizes the wall and shows however many tiles it needs.
+		SpriteTiles.Add(Tile); // Keep track of it.
+	}
 }
 
 // Bind here rather than the constructor so the components are fully initialised.
@@ -91,34 +103,42 @@ void AWallActor::SetWallLength(float NewLength)
 	RebuildVisuals(); // Redraw the artwork at the new length.
 }
 
-// Replaces the row of artwork tiles so it exactly covers the wall's length.
+// Sizes the row of artwork tiles to exactly cover the wall's length, by showing and positioning
+// however many of the pre-built pool are needed and hiding the rest.
 void AWallActor::RebuildVisuals()
 {
-	for (UPaperSpriteComponent* Tile : SpriteTiles) // Remove the old tiles.
-	{
-		if (Tile) // Skip any that are already gone.
-		{
-			Tile->DestroyComponent(); // Delete it.
-		}
-	}
-	SpriteTiles.Empty(); // Forget them.
-
 	if (!bHasSprites) // No artwork available.
 	{
-		return; // The blockout mesh is visible instead.
+		for (UPaperSpriteComponent* Tile : SpriteTiles) // Make sure none of the pool is left showing.
+		{
+			if (Tile) // Skip any that are somehow gone.
+			{
+				Tile->SetVisibility(false); // The blockout mesh is visible instead.
+			}
+		}
+		return; // Nothing more to do.
 	}
 
-	const int32 TileCount = FMath::Max(1, FMath::RoundToInt(WallLength / TileArtWidth)); // How many tiles fit.
+	const int32 TileCount = FMath::Clamp(FMath::RoundToInt(WallLength / TileArtWidth), 1, SpriteTiles.Num()); // How many tiles fit, capped to the pool size.
 	const float TileLength = WallLength / TileCount; // Stretch each slightly so the row ends exactly at the wall's ends.
-	for (int32 Index = 0; Index < TileCount; ++Index) // Create each tile.
+	for (int32 Index = 0; Index < SpriteTiles.Num(); ++Index) // Every tile in the pool.
 	{
-		UPaperSpriteComponent* Tile = NewObject<UPaperSpriteComponent>(this); // A new sprite component owned by this wall.
-		Tile->SetupAttachment(WallRoot); // Attach it to the root.
-		Tile->RegisterComponent(); // Make it live in the world.
-		ZeroDaySprites::ConfigureFlat(Tile, IntactSprite, ZeroDaySprites::HeadingRotation(), 6.f); // Lay it flat with the wall's long axis as the art's width.
-		Tile->SetRelativeLocation(FVector(-WallLength * 0.5f + (Index + 0.5f) * TileLength, 0.f, 6.f)); // Place it along the wall.
-		Tile->SetRelativeScale3D(FVector(TileLength / TileArtWidth, 1.f, 1.f)); // Stretch it to fit its share of the length.
-		SpriteTiles.Add(Tile); // Keep track of it.
+		UPaperSpriteComponent* Tile = SpriteTiles[Index]; // This slot.
+		if (!Tile) // Skip any that are somehow gone.
+		{
+			continue; // Next slot.
+		}
+		if (Index < TileCount) // This one is needed for the current length.
+		{
+			ZeroDaySprites::ConfigureFlat(Tile, IntactSprite, ZeroDaySprites::HeadingRotation(), 6.f); // Lay it flat with the wall's long axis as the art's width.
+			Tile->SetRelativeLocation(FVector(-WallLength * 0.5f + (Index + 0.5f) * TileLength, 0.f, 6.f)); // Place it along the wall.
+			Tile->SetRelativeScale3D(FVector(TileLength / TileArtWidth, 1.f, 1.f)); // Stretch it to fit its share of the length.
+			Tile->SetVisibility(true); // Show it.
+		}
+		else // Not needed at this length.
+		{
+			Tile->SetVisibility(false); // Hide the rest of the pool.
+		}
 	}
 	UpdateVisuals(); // Show the artwork that matches the current condition.
 }
@@ -193,6 +213,19 @@ void AWallActor::SetActiveThisLevel(bool bActive)
 float AWallActor::GetHealthPercent() const
 {
 	return Breachable->GetHealthPercent(); // Ask the health component.
+}
+
+// Distance to the nearest point along the wall's length, so a player standing at either end
+// of a long wall is still judged as "close to the wall", not just at its midpoint.
+float AWallActor::GetDistanceToPoint(const FVector& Point) const
+{
+	const FVector Origin = GetActorLocation(); // The wall's centre.
+	const FVector AxisDirection = GetActorForwardVector().GetSafeNormal2D(); // The wall's long axis (its length runs along local +X).
+	const float HalfLength = WallLength * 0.5f; // How far the wall extends either side of its centre.
+	const float Projected = FVector::DotProduct(Point - Origin, AxisDirection); // How far along the axis the point sits.
+	const float Clamped = FMath::Clamp(Projected, -HalfLength, HalfLength); // Stay within the wall's actual length.
+	const FVector NearestPoint = Origin + AxisDirection * Clamped; // The closest point on the wall.
+	return FVector::Dist(NearestPoint, Point); // Straight-line distance from there to the given point.
 }
 
 // Seconds left to fix a breach (0 when not breached), for the HUD.

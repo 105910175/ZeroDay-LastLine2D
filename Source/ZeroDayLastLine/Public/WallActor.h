@@ -76,6 +76,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Wall")
 	float GetHealthPercent() const;
 
+	// Distance from a world point to the closest point along the wall's length, not just its
+	// centre. Walls now span most of a city side, so "am I close enough to fix this wall" has
+	// to check the nearest point on the wall, not the (possibly very far away) middle of it.
+	UFUNCTION(BlueprintPure, Category = "Wall")
+	float GetDistanceToPoint(const FVector& Point) const;
+
 	// Seconds left to remediate a breach (0 when not breached).
 	UFUNCTION(BlueprintPure, Category = "Wall")
 	float GetRemediationTimeRemaining() const;
@@ -139,7 +145,13 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UPaperSprite> BreachedSprite;
 
-	// The artwork is repeated along the wall in tiles, so any length looks right.
+	// The artwork is repeated along the wall in tiles, so any length looks right. These are
+	// created once in the constructor (a fixed pool, enough for the longest wall we build) and
+	// only shown/repositioned afterwards — dynamically creating and destroying components at
+	// runtime turned out not to render reliably for this actor, so the wall is sized by toggling
+	// visibility on a pre-built pool instead.
+	static constexpr int32 MaxWallTiles = 16;
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UPaperSpriteComponent>> SpriteTiles;
 

@@ -117,18 +117,26 @@ def threat():
 
 
 # --------------------------------------------------------------------------- walls
+# The wall is drawn taller than before (104px, was 64px) with a thick reinforced footing
+# below the main plate, so it reads as a solid barrier rather than a thin line next to the
+# player. Paper2D shows one pixel as one world unit, so this directly makes the wall deeper.
 def wall_base(c):
-    c.shadow((6, 12, 250, 62), 110)
-    c.rect((2, 6, 254, 56), fill=STEEL, outline=NAVY, width=3, radius=8)
+    c.shadow((6, 12, 250, 100), 110)
+    c.rect((2, 6, 254, 56), fill=STEEL, outline=NAVY, width=3, radius=8)  # main plate (unchanged from before)
     c.rect((6, 30, 250, 52), fill=STEEL_DARK, radius=6)
     for x in range(64, 256, 64):  # panel seams
         c.line([(x, 8), (x, 54)], NAVY, 2)
     for x in range(14, 250, 32):  # rivets
         c.ellipse((x, 42, x + 6, 48), fill=STEEL_LIGHT, outline=NAVY, width=1)
+    # Reinforced footing: a thick base course below the plate, so the wall looks chunky and load-bearing.
+    c.rect((0, 60, 256, 68), fill=(14, 18, 30, 255))  # dark seam separating plate from footing
+    c.rect((2, 68, 254, 102), fill=STEEL_DARK, outline=NAVY, width=3, radius=8)
+    for x in range(16, 250, 30):  # footing plates
+        c.rect((x, 76, x + 18, 94), fill=STEEL, outline=NAVY, width=2, radius=3)
 
 
 def wall_intact():
-    c = Canvas(256, 64)
+    c = Canvas(256, 104)
     wall_base(c)
     c.glow((10, 8, 246, 26), CYAN, 5, 150)
     c.rect((10, 12, 246, 22), fill=CYAN, outline=CYAN_DARK, width=1, radius=4)  # energy strip
@@ -137,39 +145,41 @@ def wall_intact():
 
 
 def wall_damaged():
-    c = Canvas(256, 64)
+    c = Canvas(256, 104)
     wall_base(c)
     for (x0, x1) in ((10, 84), (100, 128), (146, 246)):  # flickering energy strip
         c.rect((x0, 12, x1, 22), fill=(230, 160, 70, 255), outline=NAVY, width=1, radius=3)
-    for pts in (
-        [(70, 6), (78, 22), (66, 34), (80, 50), (72, 58)],
-        [(176, 6), (168, 20), (182, 32), (170, 46), (178, 58)],
-        [(120, 10), (126, 24), (116, 38)],
+    for pts in (  # cracks now run all the way down into the footing
+        [(70, 6), (78, 22), (66, 34), (80, 50), (68, 74), (78, 96)],
+        [(176, 6), (168, 20), (182, 32), (170, 46), (180, 70), (168, 96)],
+        [(120, 10), (126, 24), (116, 38), (124, 60), (114, 90)],
     ):
         c.line(pts, NAVY, 4)
         c.line(pts, ORANGE, 2)
     c.rect((198, 26, 226, 44), fill=(0, 0, 0, 0))
     c.poly([(198, 26), (226, 30), (222, 44), (200, 42)], fill=(20, 24, 36, 255), outline=ORANGE, width=2)
-    for x in range(8, 250, 24):  # hazard stripe along the bottom
-        c.poly([(x, 52), (x + 12, 52), (x + 6, 56), (x - 6, 56)], fill=YELLOW)
+    for x in range(8, 250, 24):  # hazard stripe across the footing
+        c.poly([(x, 86), (x + 12, 86), (x + 6, 92), (x - 6, 92)], fill=YELLOW)
     return c.save("wall_damaged.png")
 
 
 def wall_breached():
-    c = Canvas(256, 64)
-    c.shadow((6, 12, 250, 62), 110)
-    for (x0, x1) in ((2, 92), (164, 254)):  # two broken halves with a gap
-        c.rect((x0, 6, x1, 56), fill=STEEL_DARK, outline=NAVY, width=3, radius=8)
-    c.poly([(80, 6), (96, 6), (88, 22), (98, 34), (86, 56), (72, 56)], fill=STEEL_DARK, outline=NAVY, width=3)
-    c.poly([(176, 6), (160, 6), (168, 22), (158, 34), (170, 56), (184, 56)], fill=STEEL_DARK, outline=NAVY, width=3)
-    c.glow((92, 8, 164, 58), RED, 8, 190)  # warning glow in the gap
-    c.rect((100, 10, 156, 54), fill=(60, 10, 14, 220), radius=6)
-    for pts in ([(104, 44), (116, 30), (128, 46)], [(130, 48), (142, 34), (152, 50)]):  # rubble
+    c = Canvas(256, 104)
+    c.shadow((6, 12, 250, 100), 110)
+    for (x0, x1) in ((2, 92), (164, 254)):  # two broken halves with a gap, full height
+        c.rect((x0, 6, x1, 100), fill=STEEL_DARK, outline=NAVY, width=3, radius=8)
+    c.poly([(80, 6), (96, 6), (88, 22), (98, 34), (86, 62), (98, 80), (86, 100), (72, 100)], fill=STEEL_DARK, outline=NAVY, width=3)
+    c.poly([(176, 6), (160, 6), (168, 22), (158, 34), (170, 62), (158, 80), (170, 100), (184, 100)], fill=STEEL_DARK, outline=NAVY, width=3)
+    c.glow((92, 8, 164, 100), RED, 8, 190)  # warning glow in the gap
+    c.rect((100, 10, 156, 96), fill=(60, 10, 14, 220), radius=6)
+    for pts in ([(104, 44), (116, 30), (128, 46)], [(130, 48), (142, 34), (152, 50)], [(112, 76), (124, 64), (134, 80)]):  # rubble
         c.poly(pts, fill=STEEL, outline=NAVY, width=2)
     for x in (108, 128, 148):  # warning stripes
         c.poly([(x, 12), (x + 8, 12), (x + 14, 20), (x + 6, 20)], fill=RED)
-    c.rect((10, 12, 80, 22), fill=(90, 96, 110, 255), outline=NAVY, width=1, radius=3)  # dead strip
+    c.rect((10, 12, 80, 22), fill=(90, 96, 110, 255), outline=NAVY, width=1, radius=3)  # dead strip (top)
     c.rect((176, 12, 246, 22), fill=(90, 96, 110, 255), outline=NAVY, width=1, radius=3)
+    c.rect((10, 76, 80, 86), fill=(90, 96, 110, 255), outline=NAVY, width=1, radius=3)  # dead strip (footing)
+    c.rect((176, 76, 246, 86), fill=(90, 96, 110, 255), outline=NAVY, width=1, radius=3)
     return c.save("wall_breached.png")
 
 

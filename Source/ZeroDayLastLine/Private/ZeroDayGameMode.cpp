@@ -113,12 +113,15 @@ void AZeroDayGameMode::BuildDefaultLayout()
 		float Distance; // How far from the centre.
 		float WallLength; // How long the wall is along the edge of the city.
 	};
-	constexpr float WallCoverage = 0.8f; // Each wall covers 80% of its side of the city, leaving gaps at the corners.
+	// North/South span the full width plus a bit extra on each end (WallCornerOverlap), so
+	// their ends run past the corner and overlap the East/West walls. East/West then span
+	// exactly the gap between them. The result is a seamless rectangle with no corner gaps,
+	// instead of four separate strips that stop short of meeting.
 	const FSideSetup Sides[] = {
-		{ EWallSide::North, Forward, CityHalfExtents.Y, 2.f * CityHalfExtents.X * WallCoverage }, // Front wall spans the width.
-		{ EWallSide::South, -Forward, CityHalfExtents.Y, 2.f * CityHalfExtents.X * WallCoverage }, // Back wall spans the width.
-		{ EWallSide::East, Right, CityHalfExtents.X, 2.f * CityHalfExtents.Y * WallCoverage }, // Right wall spans the depth.
-		{ EWallSide::West, -Right, CityHalfExtents.X, 2.f * CityHalfExtents.Y * WallCoverage }, // Left wall spans the depth.
+		{ EWallSide::North, Forward, CityHalfExtents.Y, 2.f * CityHalfExtents.X + 2.f * WallCornerOverlap }, // Front wall spans the width and past both corners.
+		{ EWallSide::South, -Forward, CityHalfExtents.Y, 2.f * CityHalfExtents.X + 2.f * WallCornerOverlap }, // Back wall, same.
+		{ EWallSide::East, Right, CityHalfExtents.X, 2.f * CityHalfExtents.Y }, // Right wall spans exactly the depth between North and South.
+		{ EWallSide::West, -Right, CityHalfExtents.X, 2.f * CityHalfExtents.Y }, // Left wall, same.
 	};
 
 	for (const FSideSetup& Setup : Sides) // Create a wall and spawner for each side.
