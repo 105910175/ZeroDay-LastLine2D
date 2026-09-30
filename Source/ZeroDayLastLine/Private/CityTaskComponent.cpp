@@ -1,4 +1,7 @@
 #include "CityTaskComponent.h" // This class's own declaration.
+#include "ZeroDayCharacter.h"
+#include "Audio/ZeroDayAudioComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 // Ticks every frame so the meter can drain smoothly.
 UCityTaskComponent::UCityTaskComponent()
@@ -27,12 +30,27 @@ void UCityTaskComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 
 	Condition = FMath::Clamp(Condition - DecayRatePerSecond * DecayScale * DeltaTime, 0.f, 100.f); // Drain scaled by the level, kept within 0-100.
 
-	// Notify once, on the way down, so the owner can start its grace period.
-	if (!bIsCritical && Condition <= CriticalThreshold) // First time we dropped to the threshold?
-	{
-		bIsCritical = true; // Latch critical so we only announce once.
-		OnBecameCritical.Broadcast(); // Tell the station to start its grace timer.
-	}
+
+    // Notify once, on the way down, so the owner can start its grace period.
+    if (!bIsCritical && Condition <= CriticalThreshold) // First time we dropped to the threshold?
+    {
+        bIsCritical = true; // Latch critical so we only announce once.
+        OnBecameCritical.Broadcast(); // Tell the station to start its grace timer.
+
+        // Play a warning sound so the player knows this station needs attention.
+        if (AZeroDayCharacter* Character =
+            Cast<AZeroDayCharacter>(
+                UGameplayStatics::GetPlayerPawn(this, 0)))
+        {
+            if (UZeroDayAudioComponent* AudioComponent =
+                Character->GetAudioComponent())
+            {
+                AudioComponent->PlayStationWarning(
+                    GetOwner()->GetActorLocation()
+                );
+            }
+        }
+    }
 }
 
 // Attending fully restores the task.

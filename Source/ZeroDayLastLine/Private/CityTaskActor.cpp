@@ -222,6 +222,21 @@ void ACityTaskActor::HandleGraceExpired()
     if (TaskComp->IsCritical())
     {
         OnTaskFailed.Broadcast(this);
+
+        // Play the station failed sound when the player runs out of time.
+        if (AZeroDayCharacter* Character =
+            Cast<AZeroDayCharacter>(
+                UGameplayStatics::GetPlayerPawn(this, 0)))
+        {
+            if (UZeroDayAudioComponent* AudioComponent =
+                Character->GetAudioComponent())
+            {
+                AudioComponent->PlayStationFailed(
+                    GetActorLocation()
+                );
+            }
+        }
+
         TaskComp->RestoreCondition(50.f);
     }
 }
