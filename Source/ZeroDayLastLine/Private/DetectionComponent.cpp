@@ -131,8 +131,18 @@ void UDetectionComponent::PerformValidate()
 	int32 Real = 0;
 	int32 FalsePositives = 0;
 	EThreatSeverity Highest = EThreatSeverity::Low;
-	Target->ValidateInbound(Real, FalsePositives, Highest);
-	GameMode->RecordFalsePositivesIdentified(FalsePositives); // Count the decoys we exposed for the result screen.
+    Target->ValidateInbound(Real, FalsePositives, Highest);
+
+    if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(GetOwner()))
+    {
+        if (UZeroDayAudioComponent* AudioComponent =
+            Character->GetAudioComponent())
+        {
+            AudioComponent->PlayValidate(Target->GetActorLocation());
+        }
+    }
+
+    GameMode->RecordFalsePositivesIdentified(FalsePositives);
 	GameMode->PostEffect(Target->GetActorLocation(), FLinearColor(1.f, 0.85f, 0.3f), 220.f, 0.6f); // Gold ring on the wall that was validated.
 
 	FString Result = FString::Printf(TEXT("Validate (%s wall): "), WallSideToString(Target->WallSide));
