@@ -1,5 +1,6 @@
 #include "ResourcePickup.h" // This class's own declaration.
 #include "ZeroDayCharacter.h" // Only the player can collect pickups.
+#include "Audio/ZeroDayAudioComponent.h"
 #include "ZeroDayGameMode.h" // Where collected resources go.
 #include "ZeroDayPhysics.h" // Physics materials.
 #include "ZeroDaySprites.h" // Helper that lays sprites flat.
@@ -117,10 +118,33 @@ void AResourcePickup::HandleOverlap(UPrimitiveComponent* OverlappedComponent, AA
 		{
 			return; // Leave it.
 		}
-		GameMode->AddResource(ResourceType, Amount); // Give the player the resource.
-		GameMode->RecordSupplyCollected(); // Count it for the result screen.
-		GameMode->PostAlert(FString::Printf(TEXT("+%d %s"), Amount, ResourceTypeToString(ResourceType)), FColor(150, 240, 160)); // Tell the player what they got.
-		GameMode->PostEffect(GetActorLocation(), FLinearColor(0.5f, 1.f, 0.55f), 90.f, 0.5f); // A small green ring where it was.
-	}
-	Destroy(); // The pickup is used up.
+        GameMode->AddResource(ResourceType, Amount);
+
+        if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(OtherActor))
+        {
+            if (UZeroDayAudioComponent* AudioComponent =
+                Character->GetAudioComponent())
+            {
+                AudioComponent->PlayPickup(GetActorLocation());
+            }
+        }
+
+        GameMode->RecordSupplyCollected();
+        GameMode->PostAlert(
+            FString::Printf(
+                TEXT("+%d %s"),
+                Amount,
+                ResourceTypeToString(ResourceType)
+            ),
+            FColor(150, 240, 160)
+        );
+        GameMode->PostEffect(
+            GetActorLocation(),
+            FLinearColor(0.5f, 1.f, 0.55f),
+            90.f,
+            0.5f
+        );
+    }
+
+    Destroy(); // The pickup is used up.
 }
