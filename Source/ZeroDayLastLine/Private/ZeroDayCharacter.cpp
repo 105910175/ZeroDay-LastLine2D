@@ -5,6 +5,8 @@
 #include "WallActor.h"
 #include "CityTaskActor.h"
 #include "DetectionComponent.h"
+#include "Audio/ZeroDayAudioComponent.h"
+
 #include "ZeroDayGameMode.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
@@ -42,6 +44,7 @@ AZeroDayCharacter::AZeroDayCharacter()
 
 	// Insta Scan and Validate live in their own component.
 	Detection = CreateDefaultSubobject<UDetectionComponent>(TEXT("Detection"));
+        Audio = CreateDefaultSubobject<UZeroDayAudioComponent>(TEXT("Audio"));
 }
 
 // Called when the game starts or when spawned
@@ -135,7 +138,7 @@ FVector AZeroDayCharacter::GetGroundAimPoint() const
 }
 
 // Fires a projectile from the player towards the mouse cursor, flat on the ground plane.
-void AZeroDayCharacter::Fire()
+void AZeroDayCharacter::Fire()	
 {
 	if (!ProjectileClass)
 	{
@@ -148,6 +151,10 @@ void AZeroDayCharacter::Fire()
 	{
 		AimDirection = GetActorForwardVector();
 	}
+        if (Audio)
+        {
+           Audio->PlayFire(GetActorLocation());
+        }
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;

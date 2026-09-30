@@ -12,6 +12,8 @@
 #include "Components/StaticMeshComponent.h" // The wall body.
 #include "Components/BoxComponent.h" // The threat trigger volume.
 #include "UObject/ConstructorHelpers.h" // Lets a constructor load engine and content assets.
+#include "ZeroDayCharacter.h"
+#include "Audio/ZeroDayAudioComponent.h"
 
 namespace // Only this file uses these.
 {
@@ -165,34 +167,62 @@ void AWallActor::UpdateVisuals()
 // Damage only counts while the wall is in play this level.
 void AWallActor::TakeThreatDamage(float Amount)
 {
-	if (!bIsActiveThisLevel) // Walls not in play ignore damage.
-	{
-		return; // Nothing to do.
-	}
-	Breachable->ApplyDamage(Amount); // Pass the damage to the health component.
+    if (!bIsActiveThisLevel)
+    {
+        return;
+    }
+
+    Breachable->ApplyDamage(Amount);
+
+    if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(
+        UGameplayStatics::GetPlayerPawn(this, 0)))
+    {
+        if (UZeroDayAudioComponent* AudioComponent =
+            Character->GetAudioComponent())
+        {
+            AudioComponent->PlayWallHit(GetActorLocation());
+        }
+    }
 }
 
 // Only a breached wall can be fixed, and fixing costs one Patch kit.
 bool AWallActor::AttemptFix()
 {
-	if (Breachable->GetStatus() != EWallStatus::Breached) // Is there actually a breach to fix?
-	{
-		return false; // Nothing was broken, so nothing was fixed.
-	}
+    if (Breachable->GetStatus() != EWallStatus::Breached)
+    {
+        return false;
+    }
 
-	AZeroDayGameMode* GameMode = Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this)); // Find our game mode.
-	if (GameMode && !GameMode->SpendResource(EResourceType::Patch, 1)) // Try to pay one Patch kit.
-	{
-		GameMode->PostAlert(TEXT("Not enough Patch kits to fix the wall. Clear the threats or collect more."), FColor::Orange); // Say why nothing happened.
-		return false; // Could not afford it.
-	}
+    AZeroDayGameMode* GameMode =
+        Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this));
 
-	Breachable->FullyRepair(); // Restore full health (this also cancels the countdown via the status event).
-	if (GameMode) // If there is a game mode to tell...
-	{
-		GameMode->RecordWallFixed(); // ...count the fix for the result screen.
-	}
-	return true; // Tell the caller the fix worked.
+    if (GameMode && !GameMode->SpendResource(EResourceType::Patch, 1))
+    {
+        GameMode->PostAlert(
+            TEXT("Not enough Patch kits to fix the wall. Clear the threats or collect more."),
+            FColor::Orange
+        );
+        return false;
+    }
+
+    Breachable->FullyRepair();
+
+    if (AZeroDayCharacter* Character =
+        Cast<AZeroDayCharacter>(UGameplayStatics::GetPlayerPawn(this, 0)))
+    {
+        if (UZeroDayAudioComponent* AudioComponent =
+            Character->GetAudioComponent())
+        {
+            AudioComponent->PlayWallRepaired(GetActorLocation());
+        }
+    }
+
+    if (GameMode)
+    {
+        GameMode->RecordWallFixed();
+    }
+
+    return true;
 }
 
 // Convenience passthrough to the Breachable component.
@@ -351,17 +381,27 @@ void AWallActor::ValidateInbound(int32& OutReal, int32& OutFalsePositives, EThre
 // Announce every change, swap the artwork, then start or stop the breach countdown.
 void AWallActor::HandleStatusChanged(EWallStatus NewStatus)
 {
-	UpdateVisuals(); // Show intact, cracked or broken artwork.
-	OnStatusUpdated.Broadcast(this, NewStatus); // Let the game mode raise an alert.
+    UpdateVisuals();
+    OnStatusUpdated.Broadcast(this, NewStatus);
 
-	if (NewStatus == EWallStatus::Breached) // A breach starts the clock...
-	{
-		RemediationTimer->StartCooldown(RemediationWindowSeconds, false); // ...the player must fix it in time.
-	}
-	else
-	{
-		RemediationTimer->CancelCooldown(); // Any other status means the danger has passed.
-	}
+    if (NewStatus == EWallStatus::Breached)
+    {
+        if (AZeroDayCharacter* Character =
+            Cast<AZeroDayCharacter>(UGameplayStatics::GetPlayerPawn(this, 0)))
+        {
+            if (UZeroDayAudioComponent* AudioComponent =
+                Character->GetAudioComponent())
+            {
+                AudioComponent->PlayWallBreached(GetActorLocation());
+            }
+        }
+
+        RemediationTimer->StartCooldown(RemediationWindowSeconds, false);
+    }
+    else
+    {
+        RemediationTimer->CancelCooldown();
+    }
 }
 
 // Time ran out. Only counts as lost if the wall is still breached.

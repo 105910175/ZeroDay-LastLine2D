@@ -10,6 +10,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class AZeroDayProjectile;
 class UDetectionComponent;
+class UZeroDayAudioComponent;
 
 UCLASS()
 class ZERODAYLASTLINE_API AZeroDayCharacter : public ACharacter
@@ -43,29 +44,34 @@ public:
 	FVector RightInputDirection = FVector(0.f, 1.f, 0.f);
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+    // Called when the game starts or when spawned
+    virtual void BeginPlay() override;
 
 public:
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+    // Called every frame
+    virtual void Tick(float DeltaTime) override;
 
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+    // Called to bind functionality to input
+    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+    // Gives other classes access to the audio component.
+    UZeroDayAudioComponent* GetAudioComponent() const { return Audio; }
 
 protected:
-	// Holds the camera above and behind the player.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Camera")
-	TObjectPtr<USpringArmComponent> CameraBoom;
+    // Holds the camera above and behind the player.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Camera")
+    TObjectPtr<USpringArmComponent> CameraBoom;
 
-	// The top-down view.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Camera")
-	TObjectPtr<UCameraComponent> TopDownCamera;
+    // The top-down view.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Camera")
+    TObjectPtr<UCameraComponent> TopDownCamera;
 
-	// Insta Scan (Q) and Validate (F).
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Detection")
-	TObjectPtr<UDetectionComponent> Detection;
+    // Insta Scan (Q) and Validate (F).
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Detection")
+    TObjectPtr<UDetectionComponent> Detection;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroDay|Audio")
+    TObjectPtr<UZeroDayAudioComponent> Audio;
 private:
 	// Input handlers, bound in SetupPlayerInputComponent.
 	void MoveForward(float Value);
