@@ -3,6 +3,8 @@
 #include "ZeroDayGameMode.h"
 #include "ZeroDayTypes.h"
 #include "Kismet/GameplayStatics.h"
+#include "ZeroDayCharacter.h"
+#include "Audio/ZeroDayAudioComponent.h"
 
 // No tick: everything happens in response to player input.
 UDetectionComponent::UDetectionComponent()
@@ -36,11 +38,26 @@ void UDetectionComponent::PerformScan()
 		return;
 	}
 	// Start the cooldown as soon as a scan is used.
-	NextScanTime = GetWorld()->GetTimeSeconds() + ScanCooldownSeconds;
-	if (GetOwner()) // If we know where the player is...
-	{
-		GameMode->PostEffect(GetOwner()->GetActorLocation(), FLinearColor(0.3f, 0.8f, 1.f), 900.f, 0.7f); // ...send a wide cyan scan pulse out from them.
-	}
+    NextScanTime = GetWorld()->GetTimeSeconds() + ScanCooldownSeconds;
+
+    if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(GetOwner()))
+    {
+        if (UZeroDayAudioComponent* AudioComponent =
+            Character->GetAudioComponent())
+        {
+            AudioComponent->PlayScan();
+        }
+    }
+
+    if (GetOwner())
+    {
+        GameMode->PostEffect(
+            GetOwner()->GetActorLocation(),
+            FLinearColor(0.3f, 0.8f, 1.f),
+            900.f,
+            0.7f
+        );
+    }
 
 	int32 TotalContacts = 0;
 	for (AWallActor* Wall : GameMode->GetWalls())
