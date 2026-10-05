@@ -12,6 +12,7 @@
 #include "ZeroDayHUD.h" // The HUD class this mode uses.
 #include "EngineUtils.h" // TActorIterator for finding actors of a type.
 #include "Kismet/GameplayStatics.h" // Helpers such as GetPlayerPawn.
+#include "Audio/ZeroDayAudioComponent.h"
 
 // Use our character and HUD by default, and create the two timers.
 AZeroDayGameMode::AZeroDayGameMode()
@@ -445,11 +446,23 @@ void AZeroDayGameMode::HandleSupplyDrop()
 	const FVector Location = CityCentre + FVector(FMath::Cos(Angle) * Distance, FMath::Sin(Angle) * Distance, 0.f); // The landing spot.
 	const EResourceType Type = ChooseSupplyType(); // What is inside.
 
-	if (AResourcePickup::SpawnScattered(GetWorld(), Type, Location, 250.f)) // Drop it with a little skid.
-	{
-		PostAlert(FString::Printf(TEXT("Supply drop inside the city: %s"), ResourceTypeToString(Type)), FColor(255, 220, 110)); // Tell the player what and roughly where.
-		PostEffect(Location, FLinearColor(1.f, 0.85f, 0.3f), 160.f, 0.8f); // A gold ring marks the spot.
-	}
+if (AResourcePickup::SpawnScattered(GetWorld(), Type, Location, 250.f))
+{
+    PostAlert(FString::Printf(TEXT("Supply drop inside the city: %s"), ResourceTypeToString(Type)), FColor(255, 220, 110)); // Tell the player what and roughly where.
+    PostEffect(Location, FLinearColor(1.f, 0.85f, 0.3f), 160.f, 0.8f); // A gold ring marks the spot.
+
+    // Play the supply drop sound when a crate successfully lands inside the city.
+    if (AZeroDayCharacter* Character =
+        Cast<AZeroDayCharacter>(
+            UGameplayStatics::GetPlayerPawn(this, 0)))
+    {
+        if (UZeroDayAudioComponent* AudioComponent =
+            Character->GetAudioComponent())
+        {
+            AudioComponent->PlaySupplyDrop(Location);
+        }
+    }
+}
 }
 
 // Seconds left to survive, for the HUD.
