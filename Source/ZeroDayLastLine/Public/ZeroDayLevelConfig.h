@@ -7,7 +7,7 @@
 struct ZERODAYLASTLINE_API FZeroDayLevelConfig
 {
 	// The highest level number in the game. After this one the game is complete.
-	static constexpr int32 MaxLevel = 3;
+	static constexpr int32 MaxLevel = 3; // Three levels in total.
 
 	int32 Level = 1;                       // Which level these rules belong to (1-3).
 	FString Title;                         // Short name shown on the HUD, e.g. "Level 1: Detect".

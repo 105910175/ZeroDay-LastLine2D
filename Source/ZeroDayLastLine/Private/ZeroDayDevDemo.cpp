@@ -46,7 +46,7 @@ void UZeroDayDevDemo::RunNextStep()
 	UDetectionComponent* Detection = Player ? Player->FindComponentByClass<UDetectionComponent>() : nullptr; // Scan and validate tools.
 
 	// Finds the spawner that sends threats at a given wall, so the script can create threats on demand.
-	auto SpawnAt = [&](EWallSide Side, EThreatSeverity Severity, bool bDecoy)
+	auto SpawnAt = [&](EWallSide Side, EThreatSeverity Severity, bool bDecoy) // Helper: spawn a threat at a wall.
 	{
 		for (AThreatSpawnerActor* Spawner : GameMode->GetSpawners()) // Look at each spawner.
 		{
@@ -62,7 +62,7 @@ void UZeroDayDevDemo::RunNextStep()
 	};
 
 	// Saves a screenshot with a readable name under Saved/Screenshots.
-	auto Shot = [&](const TCHAR* Name)
+	auto Shot = [&](const TCHAR* Name) // Helper: take a screenshot.
 	{
 		FScreenshotRequest::RequestScreenshot(FString::Printf(TEXT("ZeroDayDemo_%s"), Name), true, false); // Ask the engine to save the next frame (HUD included) under Saved/Screenshots.
 	};
@@ -88,7 +88,7 @@ void UZeroDayDevDemo::RunNextStep()
 					// Approach along the direction from the player's own spawn point to the wall, rather than
 					// assuming a fixed world axis: the city's "forward" direction depends on the character's
 					// ForwardInputDirection (world +X in this game), not a fixed +Y.
-					const FVector ToWall = (Wall->GetActorLocation() - Player->GetActorLocation()).GetSafeNormal2D();
+					const FVector ToWall = (Wall->GetActorLocation() - Player->GetActorLocation()).GetSafeNormal2D(); // Direction from the player to the wall.
 					Player->SetActorLocation(Wall->GetActorLocation() - ToWall * 220.f); // Just inside the wall, close enough to read its art clearly.
 					break; // Done.
 				}
@@ -96,12 +96,27 @@ void UZeroDayDevDemo::RunNextStep()
 		}
 		break;
 	case 3: Shot(TEXT("01b_wall_closeup")); break; // The wall's actual size and design next to the player.
-	case 4: if (Player) { Player->SetActorLocation(FVector::ZeroVector); } break; // Back to the city centre for the rest of the script.
+	case 4: // Bring the threats into view just outside the north wall (they normally start well off screen), and stay by the wall so Validate is in range.
+		for (AWallActor* Wall : GameMode->GetWalls()) // Find the north wall.
+		{
+			if (Wall && Wall->WallSide == EWallSide::North && Player) // The one the threats are heading for.
+			{
+				const FVector OutDirection = (Wall->GetActorLocation() - Player->GetActorLocation()).GetSafeNormal2D(); // Away from the player, through the wall.
+				int32 Slot = 0; // Spreads the threats out sideways.
+				for (TActorIterator<AThreatPawn> It(World); It; ++It) // Every threat.
+				{
+					const FVector Sideways = FVector(-OutDirection.Y, OutDirection.X, 0.f); // Along the wall.
+					It->SetActorLocation(Wall->GetActorLocation() + OutDirection * 700.f + Sideways * (Slot - 1) * 450.f); // Just beyond the wall, in a row.
+					++Slot; // Next position.
+				}
+			}
+		}
+		break;
 	case 5: if (Detection) { Detection->PerformScan(); } break; // Insta Scan.
 	case 6: Shot(TEXT("02_level1_scanned")); break; // Scan ring and "?" markers.
 	case 7: if (Detection) { Detection->PerformValidate(); } break; // Validate.
 	case 8: Shot(TEXT("03_level1_validated")); break; // Severity and FALSE POSITIVE labels.
-	case 9: if (Player) { Player->SetActorRotation(FRotator(0.f, 90.f, 0.f)); } break; // Turn the character, as walking would.
+	case 9: if (Player) { Player->SetActorLocation(FVector::ZeroVector); Player->SetActorRotation(FRotator(0.f, 90.f, 0.f)); } break; // Back to the city centre, and turn the character, as walking would.
 	case 10: // Did the camera turn with it?
 		if (Player)
 		{

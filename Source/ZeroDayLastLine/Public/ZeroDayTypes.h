@@ -58,10 +58,10 @@ enum class EResourceType : uint8 // A small integer-backed enum.
 };
 
 // How many resource types there are (used to size the inventory array).
-constexpr int32 ZeroDayResourceTypeCount = 5;
+constexpr int32 ZeroDayResourceTypeCount = 5; // Used to size arrays.
 
 // Display name of a wall side, used in HUD text and alerts.
-inline const TCHAR* WallSideToString(EWallSide Side)
+inline const TCHAR* WallSideToString(EWallSide Side) // Name of a wall side.
 {
 	switch (Side) // Pick the text for this side.
 	{
@@ -73,7 +73,7 @@ inline const TCHAR* WallSideToString(EWallSide Side)
 }
 
 // Display name of a station, used in HUD text and alerts.
-inline const TCHAR* TaskKindToString(ECityTaskKind Kind)
+inline const TCHAR* TaskKindToString(ECityTaskKind Kind) // Name of a station.
 {
 	switch (Kind) // Pick the text for this station.
 	{
@@ -84,7 +84,7 @@ inline const TCHAR* TaskKindToString(ECityTaskKind Kind)
 }
 
 // Display name of a threat severity, used in HUD text and alerts.
-inline const TCHAR* SeverityToString(EThreatSeverity Severity)
+inline const TCHAR* SeverityToString(EThreatSeverity Severity) // Name of a severity.
 {
 	switch (Severity) // Pick the text for this severity.
 	{
@@ -95,7 +95,7 @@ inline const TCHAR* SeverityToString(EThreatSeverity Severity)
 }
 
 // Display name of a resource, used in HUD text and alerts.
-inline const TCHAR* ResourceTypeToString(EResourceType Type)
+inline const TCHAR* ResourceTypeToString(EResourceType Type) // Name of a resource.
 {
 	switch (Type) // Pick the text for this resource.
 	{
@@ -108,7 +108,7 @@ inline const TCHAR* ResourceTypeToString(EResourceType Type)
 }
 
 // Which resource a station needs to be attended.
-inline EResourceType ResourceForTask(ECityTaskKind Kind)
+inline EResourceType ResourceForTask(ECityTaskKind Kind) // The resource a station needs.
 {
 	switch (Kind) // Each station uses its own resource.
 	{

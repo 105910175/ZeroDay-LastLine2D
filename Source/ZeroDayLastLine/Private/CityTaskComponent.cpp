@@ -1,7 +1,7 @@
 #include "CityTaskComponent.h" // This class's own declaration.
-#include "ZeroDayCharacter.h"
-#include "Audio/ZeroDayAudioComponent.h"
-#include "Kismet/GameplayStatics.h"
+#include "ZeroDayCharacter.h" // The player, whose audio component plays the warning.
+#include "Audio/ZeroDayAudioComponent.h" // The sound effect player.
+#include "Kismet/GameplayStatics.h" // Lets us find the player.
 
 // Ticks every frame so the meter can drain smoothly.
 UCityTaskComponent::UCityTaskComponent()
@@ -31,26 +31,26 @@ void UCityTaskComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	Condition = FMath::Clamp(Condition - DecayRatePerSecond * DecayScale * DeltaTime, 0.f, 100.f); // Drain scaled by the level, kept within 0-100.
 
 
-    // Notify once, on the way down, so the owner can start its grace period.
-    if (!bIsCritical && Condition <= CriticalThreshold) // First time we dropped to the threshold?
-    {
-        bIsCritical = true; // Latch critical so we only announce once.
-        OnBecameCritical.Broadcast(); // Tell the station to start its grace timer.
+	// Notify once, on the way down, so the owner can start its grace period.
+	if (!bIsCritical && Condition <= CriticalThreshold) // First time we dropped to the threshold?
+	{
+		bIsCritical = true; // Latch critical so we only announce once.
+		OnBecameCritical.Broadcast(); // Tell the station to start its grace timer.
 
-        // Play a warning sound so the player knows this station needs attention.
-        if (AZeroDayCharacter* Character =
-            Cast<AZeroDayCharacter>(
-                UGameplayStatics::GetPlayerPawn(this, 0)))
-        {
-            if (UZeroDayAudioComponent* AudioComponent =
-                Character->GetAudioComponent())
-            {
-                AudioComponent->PlayStationWarning(
-                    GetOwner()->GetActorLocation()
-                );
-            }
-        }
-    }
+		// Play a warning sound so the player knows this station needs attention.
+		if (AZeroDayCharacter* Character = // The player, who owns the audio component.
+			Cast<AZeroDayCharacter>(
+				UGameplayStatics::GetPlayerPawn(this, 0))) // Player 0's pawn.
+		{
+			if (UZeroDayAudioComponent* AudioComponent = // The sound player.
+				Character->GetAudioComponent())
+			{
+				AudioComponent->PlayStationWarning( // Warn the player.
+					GetOwner()->GetActorLocation() // From the station that went critical.
+				);
+			}
+		}
+	}
 }
 
 // Attending fully restores the task.

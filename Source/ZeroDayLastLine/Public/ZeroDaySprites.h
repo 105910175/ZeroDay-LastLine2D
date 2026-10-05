@@ -7,7 +7,7 @@ class UPaperSprite; // Forward declaration: Paper2D's sprite asset.
 
 // Helpers for showing 2D sprites in a top-down game. Paper2D sprites stand upright by default,
 // so they have to be laid flat to be seen from above.
-namespace ZeroDaySprites
+namespace ZeroDaySprites // Helpers for flat sprites.
 {
 	// Lays a sprite flat with its art upright on the screen (image right = +Y, image up = +X).
 	// Use for things that never turn, such as stations, pickups and walls' icons.

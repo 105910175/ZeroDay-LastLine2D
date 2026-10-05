@@ -1,6 +1,6 @@
 #include "ResourcePickup.h" // This class's own declaration.
 #include "ZeroDayCharacter.h" // Only the player can collect pickups.
-#include "Audio/ZeroDayAudioComponent.h"
+#include "Audio/ZeroDayAudioComponent.h" // The sound effect player.
 #include "ZeroDayGameMode.h" // Where collected resources go.
 #include "ZeroDayPhysics.h" // Physics materials.
 #include "ZeroDaySprites.h" // Helper that lays sprites flat.
@@ -16,11 +16,11 @@ namespace // Only this file uses these.
 	constexpr float BodyRadius = 30.f; // Physical size of a pickup.
 	constexpr float PickupLifetimeSeconds = 35.f; // Uncollected pickups disappear after this long.
 	const TCHAR* SpritePaths[ZeroDayResourceTypeCount] = { // One picture per resource type, in enum order.
-		TEXT("/Game/Sprites/S_pickup_intel.S_pickup_intel"),
-		TEXT("/Game/Sprites/S_pickup_patch.S_pickup_patch"),
-		TEXT("/Game/Sprites/S_pickup_food.S_pickup_food"),
-		TEXT("/Game/Sprites/S_pickup_power.S_pickup_power"),
-		TEXT("/Game/Sprites/S_pickup_medical.S_pickup_medical"),
+		TEXT("/Game/Sprites/S_pickup_intel.S_pickup_intel"), // Intel chip.
+		TEXT("/Game/Sprites/S_pickup_patch.S_pickup_patch"), // Patch parts.
+		TEXT("/Game/Sprites/S_pickup_food.S_pickup_food"), // Food crate.
+		TEXT("/Game/Sprites/S_pickup_power.S_pickup_power"), // Battery cell.
+		TEXT("/Game/Sprites/S_pickup_medical.S_pickup_medical"), // Medical case.
 	};
 }
 
@@ -118,33 +118,33 @@ void AResourcePickup::HandleOverlap(UPrimitiveComponent* OverlappedComponent, AA
 		{
 			return; // Leave it.
 		}
-        GameMode->AddResource(ResourceType, Amount);
+		GameMode->AddResource(ResourceType, Amount); // Give the player the resource.
 
-        if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(OtherActor))
-        {
-            if (UZeroDayAudioComponent* AudioComponent =
-                Character->GetAudioComponent())
-            {
-                AudioComponent->PlayPickup(GetActorLocation());
-            }
-        }
+		if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(OtherActor)) // The player who touched it.
+		{
+			if (UZeroDayAudioComponent* AudioComponent = // The sound player.
+				Character->GetAudioComponent())
+			{
+				AudioComponent->PlayPickup(GetActorLocation()); // Play the pickup chime from where it was.
+			}
+		}
 
-        GameMode->RecordSupplyCollected();
-        GameMode->PostAlert(
-            FString::Printf(
-                TEXT("+%d %s"),
-                Amount,
-                ResourceTypeToString(ResourceType)
-            ),
-            FColor(150, 240, 160)
-        );
-        GameMode->PostEffect(
-            GetActorLocation(),
-            FLinearColor(0.5f, 1.f, 0.55f),
-            90.f,
-            0.5f
-        );
-    }
+		GameMode->RecordSupplyCollected(); // Count it for the result screen.
+		GameMode->PostAlert( // Tell the player what they got.
+			FString::Printf( // Build the message.
+				TEXT("+%d %s"), // For example "+1 Patch".
+				Amount, // How many.
+				ResourceTypeToString(ResourceType) // Which resource.
+			),
+			FColor(150, 240, 160) // Soft green.
+		);
+		GameMode->PostEffect( // A small green ring where it was.
+			GetActorLocation(), // At the pickup.
+			FLinearColor(0.5f, 1.f, 0.55f), // Green.
+			90.f, // Ring size.
+			0.5f // Ring duration.
+		);
+	}
 
-    Destroy(); // The pickup is used up.
+	Destroy(); // The pickup is used up.
 }

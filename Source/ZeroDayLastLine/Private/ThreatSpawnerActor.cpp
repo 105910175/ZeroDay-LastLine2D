@@ -4,7 +4,7 @@
 #include "CooldownComponent.h" // The spawn timer.
 #include "ZeroDayLevelConfig.h" // The level rules we obey.
 #include "Components/SceneComponent.h" // A plain transform to use as the root.
-#include "Kismet/GameplayStatics.h"
+#include "Kismet/GameplayStatics.h" // Lets us find the player to record as the instigator.
 
 // Just a transform in the level plus a timer; spawned threats appear at this actor's location.
 AThreatSpawnerActor::AThreatSpawnerActor()
@@ -88,12 +88,13 @@ bool AThreatSpawnerActor::SpawnThreat(EThreatSeverity Severity, bool bDecoy)
 		return false; // Report failure.
 	}
 
-    FActorSpawnParameters SpawnParams; // Settings for the spawn call.
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn; // Always appear, nudged if something is in the way.
-    SpawnParams.Instigator = UGameplayStatics::GetPlayerPawn(this, 0); // Remember which player caused this threat to be spawned.
+	FActorSpawnParameters SpawnParams; // Settings for the spawn call.
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn; // Always appear, nudged if something is in the way.
+	SpawnParams.Instigator = UGameplayStatics::GetPlayerPawn(this, 0); // Remember which player caused this threat to be spawned.
 
 	// Scatter spawn points a little so a group of threats doesn't stack in one spot.
-	const FVector Scatter(FMath::FRandRange(-150.f, 150.f), FMath::FRandRange(-150.f, 150.f), 0.f); // Random ground-plane offset.
+	const float ScatterRange = 100.f * GetDefault<AThreatPawn>(ThreatClass)->VisualScale; // Bigger threats need more room (400 units each way at 4x) so they do not stack on each other.
+	const FVector Scatter(FMath::FRandRange(-ScatterRange, ScatterRange), FMath::FRandRange(-ScatterRange, ScatterRange), 0.f); // Random ground-plane offset.
 	AThreatPawn* NewThreat = GetWorld()->SpawnActor<AThreatPawn>(ThreatClass, GetActorLocation() + Scatter, GetActorRotation(), SpawnParams); // Create the threat.
 	if (!NewThreat) // The engine refused to spawn it.
 	{

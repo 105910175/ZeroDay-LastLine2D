@@ -12,7 +12,7 @@
 #include "ZeroDayHUD.h" // The HUD class this mode uses.
 #include "EngineUtils.h" // TActorIterator for finding actors of a type.
 #include "Kismet/GameplayStatics.h" // Helpers such as GetPlayerPawn.
-#include "Audio/ZeroDayAudioComponent.h"
+#include "Audio/ZeroDayAudioComponent.h" // The sound effect player.
 
 // Use our character and HUD by default, and create the two timers.
 AZeroDayGameMode::AZeroDayGameMode()
@@ -107,7 +107,7 @@ void AZeroDayGameMode::BuildDefaultLayout()
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn; // Always appear, even if overlapping.
 
 	// Describe each side once so the four walls are created by one loop.
-	struct FSideSetup
+	struct FSideSetup // Describes one wall and where it goes.
 	{
 		EWallSide Side; // Which wall this is.
 		FVector Direction; // Which way it lies from the centre.
@@ -118,7 +118,7 @@ void AZeroDayGameMode::BuildDefaultLayout()
 	// their ends run past the corner and overlap the East/West walls. East/West then span
 	// exactly the gap between them. The result is a seamless rectangle with no corner gaps,
 	// instead of four separate strips that stop short of meeting.
-	const FSideSetup Sides[] = {
+	const FSideSetup Sides[] = { // The four sides.
 		{ EWallSide::North, Forward, CityHalfExtents.Y, 2.f * CityHalfExtents.X + 2.f * WallCornerOverlap }, // Front wall spans the width and past both corners.
 		{ EWallSide::South, -Forward, CityHalfExtents.Y, 2.f * CityHalfExtents.X + 2.f * WallCornerOverlap }, // Back wall, same.
 		{ EWallSide::East, Right, CityHalfExtents.X, 2.f * CityHalfExtents.Y }, // Right wall spans exactly the depth between North and South.
@@ -148,12 +148,12 @@ void AZeroDayGameMode::BuildDefaultLayout()
 	}
 
 	// Three stations inside the walls, spread out so the player has to run between them.
-	struct FStationSetup
+	struct FStationSetup // Describes one station and where it goes.
 	{
 		ECityTaskKind Kind; // Which station this is.
 		FVector Position; // Where it stands.
 	};
-	const FStationSetup Stations[] = {
+	const FStationSetup Stations[] = { // The three stations.
 		{ ECityTaskKind::Power, Centre + Right * (-CityHalfExtents.X * 0.45f) + Forward * (CityHalfExtents.Y * 0.30f) }, // Front-left.
 		{ ECityTaskKind::Food, Centre + Right * (CityHalfExtents.X * 0.45f) + Forward * (CityHalfExtents.Y * 0.30f) }, // Front-right.
 		{ ECityTaskKind::Medic, Centre + Forward * (-CityHalfExtents.Y * 0.40f) }, // Back-middle.
@@ -446,23 +446,23 @@ void AZeroDayGameMode::HandleSupplyDrop()
 	const FVector Location = CityCentre + FVector(FMath::Cos(Angle) * Distance, FMath::Sin(Angle) * Distance, 0.f); // The landing spot.
 	const EResourceType Type = ChooseSupplyType(); // What is inside.
 
-if (AResourcePickup::SpawnScattered(GetWorld(), Type, Location, 250.f))
-{
-    PostAlert(FString::Printf(TEXT("Supply drop inside the city: %s"), ResourceTypeToString(Type)), FColor(255, 220, 110)); // Tell the player what and roughly where.
-    PostEffect(Location, FLinearColor(1.f, 0.85f, 0.3f), 160.f, 0.8f); // A gold ring marks the spot.
+	if (AResourcePickup::SpawnScattered(GetWorld(), Type, Location, 250.f)) // Drop it with a little skid.
+	{
+		PostAlert(FString::Printf(TEXT("Supply drop inside the city: %s"), ResourceTypeToString(Type)), FColor(255, 220, 110)); // Tell the player what and roughly where.
+		PostEffect(Location, FLinearColor(1.f, 0.85f, 0.3f), 160.f, 0.8f); // A gold ring marks the spot.
 
-    // Play the supply drop sound when a crate successfully lands inside the city.
-    if (AZeroDayCharacter* Character =
-        Cast<AZeroDayCharacter>(
-            UGameplayStatics::GetPlayerPawn(this, 0)))
-    {
-        if (UZeroDayAudioComponent* AudioComponent =
-            Character->GetAudioComponent())
-        {
-            AudioComponent->PlaySupplyDrop(Location);
-        }
-    }
-}
+		// Play the supply drop sound when a crate successfully lands inside the city.
+		if (AZeroDayCharacter* Character = // The player, who owns the audio component.
+			Cast<AZeroDayCharacter>( // Treat the pawn as our character.
+				UGameplayStatics::GetPlayerPawn(this, 0))) // Player 0's pawn.
+		{
+			if (UZeroDayAudioComponent* AudioComponent = // The sound player.
+				Character->GetAudioComponent()) // Fetch its sound player.
+			{
+				AudioComponent->PlaySupplyDrop(Location); // Play the drop sound where it landed.
+			}
+		}
+	}
 }
 
 // Seconds left to survive, for the HUD.
@@ -534,25 +534,14 @@ void AZeroDayGameMode::HandleTaskFailed(ACityTaskActor* FailedTask)
 // The level timer ran out with everything still standing: win.
 void AZeroDayGameMode::HandleLevelSurvived()
 {
-    if (AZeroDayCharacter* Character =
-        Cast<AZeroDayCharacter>(
-            UGameplayStatics::GetPlayerPawn(this, 0)))
-    {
-        if (UZeroDayAudioComponent* AudioComponent =
-            Character->GetAudioComponent())
-        {
-            AudioComponent->PlayLevelWon();
-        }
-    }
-
-    if (CurrentLevel >= FZeroDayLevelConfig::MaxLevel) // Was that the last level?
-    {
-        EndGame(true, TEXT("All three levels cleared. The zero-day is contained and the city is safe.")); // Whole game won.
-    }
-    else
-    {
-        EndGame(true, FString::Printf(TEXT("Level %d cleared. The city holds."), CurrentLevel)); // Just this level won.
-    }
+	if (CurrentLevel >= FZeroDayLevelConfig::MaxLevel) // Was that the last level?
+	{
+		EndGame(true, TEXT("All three levels cleared. The zero-day is contained and the city is safe.")); // Whole game won.
+	}
+	else
+	{
+		EndGame(true, FString::Printf(TEXT("Level %d cleared. The city holds."), CurrentLevel)); // Just this level won.
+	}
 }
 
 // Zero-day surge (level 3): a burst of critical threats at one randomly chosen wall.
@@ -576,44 +565,52 @@ void AZeroDayGameMode::HandleSurge()
 		return; // Skip this surge.
 	}
 
-    AThreatSpawnerActor* Chosen = Candidates[FMath::RandRange(0, Candidates.Num() - 1)];
-    Chosen->SpawnBurst(Config.SurgeThreatCount, EThreatSeverity::Critical); // Send the critical wave.
+	AThreatSpawnerActor* Chosen = Candidates[FMath::RandRange(0, Candidates.Num() - 1)]; // Pick one at random.
+	Chosen->SpawnBurst(Config.SurgeThreatCount, EThreatSeverity::Critical); // Send the critical wave.
 
-    // Play the surge sound when the critical wave begins.
-    if (AZeroDayCharacter* Character =
-        Cast<AZeroDayCharacter>(
-            UGameplayStatics::GetPlayerPawn(this, 0)))
-    {
-        if (UZeroDayAudioComponent* AudioComponent =
-            Character->GetAudioComponent())
-        {
-            AudioComponent->PlaySurge();
-        }
-    }
+	// Play the surge sound when the critical wave begins.
+	if (AZeroDayCharacter* Character = // The player, who owns the audio component.
+		Cast<AZeroDayCharacter>( // Treat the pawn as our character.
+			UGameplayStatics::GetPlayerPawn(this, 0))) // Player 0's pawn.
+	{
+		if (UZeroDayAudioComponent* AudioComponent = // The sound player.
+			Character->GetAudioComponent()) // Fetch its sound player.
+		{
+			AudioComponent->PlaySurge(); // Play the surge warning sound.
+		}
+	}
 
-    PostAlert(FString::Printf(TEXT("ZERO-DAY SURGE: critical exploits inbound on the %s wall!"), WallSideToString(Chosen->TargetWall->WallSide)), FColor(255, 105, 90)); // Warn the player.
-    }
+	PostAlert(FString::Printf(TEXT("ZERO-DAY SURGE: critical exploits inbound on the %s wall!"), WallSideToString(Chosen->TargetWall->WallSide)), FColor(255, 105, 90)); // Warn the player.
+}
 
-    // Stops the timers and spawners and records the result for the HUD.
-    void AZeroDayGameMode::EndGame(bool bWon, const FString& Reason)
+// Stops the timers and spawners and records the result for the HUD.
+void AZeroDayGameMode::EndGame(bool bWon, const FString& Reason)
 {
-        if (!bWon)
-        {
-            if (AZeroDayCharacter* Character =
-                Cast<AZeroDayCharacter>(
-                    UGameplayStatics::GetPlayerPawn(this, 0)))
-            {
-                if (UZeroDayAudioComponent* AudioComponent =
-                    Character->GetAudioComponent())
-                {
-                    AudioComponent->PlayLevelLost();
-                }
-            }
-        }
 	if (bGameEnded) // Already over?
 	{
-		return; // Only end once.
+		return; // Only end once (and so the win/lose sound can only play once too).
 	}
+
+	// Play the result sound here, after the guard above. It used to play before the guard, so two
+	// things failing in the same moment (for example two walls) would play the defeat sound twice.
+	if (AZeroDayCharacter* Character = // The player, who owns the audio component.
+		Cast<AZeroDayCharacter>( // Treat the pawn as our character.
+			UGameplayStatics::GetPlayerPawn(this, 0))) // Player 0's pawn.
+	{
+		if (UZeroDayAudioComponent* AudioComponent = // The sound player.
+			Character->GetAudioComponent()) // Fetch its sound player.
+		{
+			if (bWon) // A win gets the victory sound...
+			{
+				AudioComponent->PlayLevelWon(); // Play the victory sound.
+			}
+			else // ...and a loss gets the defeat sound.
+			{
+				AudioComponent->PlayLevelLost(); // Play the defeat sound.
+			}
+		}
+	}
+
 	bGameEnded = true; // Latch the ended state.
 	bPlayerWon = bWon; // Remember the result.
 	EndMessage = Reason; // Remember why, for the end screen.

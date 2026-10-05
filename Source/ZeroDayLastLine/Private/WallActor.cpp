@@ -12,14 +12,14 @@
 #include "Components/StaticMeshComponent.h" // The wall body.
 #include "Components/BoxComponent.h" // The threat trigger volume.
 #include "UObject/ConstructorHelpers.h" // Lets a constructor load engine and content assets.
-#include "ZeroDayCharacter.h"
-#include "Audio/ZeroDayAudioComponent.h"
+#include "ZeroDayCharacter.h" // The player, whose audio component plays wall sounds.
+#include "Audio/ZeroDayAudioComponent.h" // The sound effect player.
 
 namespace // Only this file uses these.
 {
-	constexpr float TileArtWidth = 256.f; // Each artwork tile is 256 pixels (= units) wide.
-	constexpr float WallBodyHeight = 60.f; // How tall the invisible collision body is.
-	constexpr float WallBodyDepth = 96.f; // How thick the invisible collision body is (matches the 104px-tall artwork with its reinforced footing, so the wall reads as a solid barrier next to the player).
+	constexpr float FallbackTileArtWidth = 100.f; // Used only if the sprite size cannot be read (256 pixels at the 2.56 pixels per unit the sprites use).
+	constexpr float WallBodyHeight = 60.f; // How tall the invisible collision body is (at the original size; multiplied by WallSizeScale).
+	constexpr float WallBodyDepth = 96.f; // How thick the invisible collision body is at the original size, before WallSizeScale (matches the 104px-tall artwork with its reinforced footing, so the wall reads as a solid barrier next to the player).
 	constexpr float ContactZoneHalfDepth = 160.f; // How far in front of/behind the wall a threat counts as arriving.
 }
 
@@ -41,7 +41,7 @@ AWallActor::AWallActor()
 	{
 		WallMesh->SetStaticMesh(CubeMeshAsset.Object); // Show the cube.
 	}
-	WallMesh->SetRelativeScale3D(FVector(WallLength / 100.f, WallBodyDepth / 100.f, WallBodyHeight / 100.f)); // Long, thin and low.
+	WallMesh->SetRelativeScale3D(FVector(WallLength / 100.f, WallBodyDepth * WallSizeScale / 100.f, WallBodyHeight * WallSizeScale / 100.f)); // Long, thin and low.
 
 	WallMesh->SetCollisionObjectType(ECC_GameTraceChannel1); // Wall channel (GameTraceChannel1).
 	WallMesh->SetCollisionResponseToAllChannels(ECR_Block); // Block everything by default...
@@ -49,7 +49,7 @@ AWallActor::AWallActor()
 
 	ThreatContactZone = CreateDefaultSubobject<UBoxComponent>(TEXT("ThreatContactZone")); // Trigger volume around the wall.
 	ThreatContactZone->SetupAttachment(WallRoot); // Attach it to the root (so the mesh scale does not stretch it).
-	ThreatContactZone->SetBoxExtent(FVector(WallLength * 0.5f + 20.f, ContactZoneHalfDepth, 120.f)); // A little longer than the wall and deeper than its body.
+	ThreatContactZone->SetBoxExtent(FVector(WallLength * 0.5f + 20.f, ContactZoneHalfDepth * WallSizeScale, 120.f * WallSizeScale)); // A little longer than the wall and deeper than its body.
 	ThreatContactZone->SetCollisionObjectType(ECC_GameTraceChannel1); // Reports as the Wall channel.
 	ThreatContactZone->SetCollisionResponseToAllChannels(ECR_Ignore); // Ignore everything...
 	ThreatContactZone->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Overlap); // ...except threats, which should trigger it.
@@ -100,8 +100,8 @@ void AWallActor::BeginPlay()
 void AWallActor::SetWallLength(float NewLength)
 {
 	WallLength = FMath::Max(50.f, NewLength); // Never shorter than 50 units.
-	WallMesh->SetRelativeScale3D(FVector(WallLength / 100.f, WallBodyDepth / 100.f, WallBodyHeight / 100.f)); // Stretch the body (the cube is 100 units).
-	ThreatContactZone->SetBoxExtent(FVector(WallLength * 0.5f + 20.f, ContactZoneHalfDepth, 120.f)); // Keep the trigger zone matched.
+	WallMesh->SetRelativeScale3D(FVector(WallLength / 100.f, WallBodyDepth * WallSizeScale / 100.f, WallBodyHeight * WallSizeScale / 100.f)); // Stretch the body (the cube is 100 units).
+	ThreatContactZone->SetBoxExtent(FVector(WallLength * 0.5f + 20.f, ContactZoneHalfDepth * WallSizeScale, 120.f * WallSizeScale)); // Keep the trigger zone matched.
 	RebuildVisuals(); // Redraw the artwork at the new length.
 }
 
@@ -121,7 +121,11 @@ void AWallActor::RebuildVisuals()
 		return; // Nothing more to do.
 	}
 
-	const int32 TileCount = FMath::Clamp(FMath::RoundToInt(WallLength / TileArtWidth), 1, SpriteTiles.Num()); // How many tiles fit, capped to the pool size.
+	// How wide one tile of artwork really is in the world. Paper2D draws a sprite at (pixels / PixelsPerUnrealUnit)
+	// units, and this project's sprites use 2.56 pixels per unit, so the 256 pixel tile is only 100 units wide.
+	// (The old code assumed 256 units, which left a gap between every pair of tiles.)
+	const float ArtWorldWidth = (IntactSprite && IntactSprite->GetPixelsPerUnrealUnit() > 0.f) ? IntactSprite->GetSourceSize().X / IntactSprite->GetPixelsPerUnrealUnit() : FallbackTileArtWidth; // Tile width in world units.
+	const int32 TileCount = FMath::Clamp(FMath::RoundToInt(WallLength / ArtWorldWidth), 1, SpriteTiles.Num()); // How many tiles fit, capped to the pool size.
 	const float TileLength = WallLength / TileCount; // Stretch each slightly so the row ends exactly at the wall's ends.
 	for (int32 Index = 0; Index < SpriteTiles.Num(); ++Index) // Every tile in the pool.
 	{
@@ -134,7 +138,7 @@ void AWallActor::RebuildVisuals()
 		{
 			ZeroDaySprites::ConfigureFlat(Tile, IntactSprite, ZeroDaySprites::HeadingRotation(), 6.f); // Lay it flat with the wall's long axis as the art's width.
 			Tile->SetRelativeLocation(FVector(-WallLength * 0.5f + (Index + 0.5f) * TileLength, 0.f, 6.f)); // Place it along the wall.
-			Tile->SetRelativeScale3D(FVector(TileLength / TileArtWidth, 1.f, 1.f)); // Stretch it to fit its share of the length.
+			Tile->SetRelativeScale3D(FVector(TileLength / ArtWorldWidth, 1.f, WallSizeScale)); // Stretch it to fit its share of the length, and make the artwork WallSizeScale times thicker.
 			Tile->SetVisibility(true); // Show it.
 		}
 		else // Not needed at this length.
@@ -167,62 +171,67 @@ void AWallActor::UpdateVisuals()
 // Damage only counts while the wall is in play this level.
 void AWallActor::TakeThreatDamage(float Amount)
 {
-    if (!bIsActiveThisLevel)
-    {
-        return;
-    }
+	if (!bIsActiveThisLevel) // Walls not in play ignore damage.
+	{
+		return; // Nothing to do.
+	}
 
-    Breachable->ApplyDamage(Amount);
+	Breachable->ApplyDamage(Amount); // Pass the damage to the health component.
 
-    if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(
-        UGameplayStatics::GetPlayerPawn(this, 0)))
-    {
-        if (UZeroDayAudioComponent* AudioComponent =
-            Character->GetAudioComponent())
-        {
-            AudioComponent->PlayWallHit(GetActorLocation());
-        }
-    }
+	if (Amount <= 0.f) // A harmless false positive touched the wall.
+	{
+		return; // No damage means no impact sound either (otherwise the sound would give the decoy away).
+	}
+
+	if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>( // The player, who owns the audio component.
+		UGameplayStatics::GetPlayerPawn(this, 0))) // Player 0's pawn.
+	{
+		if (UZeroDayAudioComponent* AudioComponent = // The sound player.
+			Character->GetAudioComponent())
+		{
+			AudioComponent->PlayWallHit(GetActorLocation()); // Play the impact sound from the wall.
+		}
+	}
 }
 
 // Only a breached wall can be fixed, and fixing costs one Patch kit.
 bool AWallActor::AttemptFix()
 {
-    if (Breachable->GetStatus() != EWallStatus::Breached)
-    {
-        return false;
-    }
+	if (Breachable->GetStatus() != EWallStatus::Breached) // Is there actually a breach to fix?
+	{
+		return false; // Nothing was broken, so nothing was fixed.
+	}
 
-    AZeroDayGameMode* GameMode =
-        Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this));
+	AZeroDayGameMode* GameMode = // Find our game mode.
+		Cast<AZeroDayGameMode>(UGameplayStatics::GetGameMode(this));
 
-    if (GameMode && !GameMode->SpendResource(EResourceType::Patch, 1))
-    {
-        GameMode->PostAlert(
-            TEXT("Not enough Patch kits to fix the wall. Clear the threats or collect more."),
-            FColor::Orange
-        );
-        return false;
-    }
+	if (GameMode && !GameMode->SpendResource(EResourceType::Patch, 1)) // Try to pay one Patch kit.
+	{
+		GameMode->PostAlert( // Say why nothing happened.
+			TEXT("Not enough Patch kits to fix the wall. Clear the threats or collect more."), // The message.
+			FColor::Orange // Warning colour.
+		);
+		return false; // Could not afford it.
+	}
 
-    Breachable->FullyRepair();
+	Breachable->FullyRepair(); // Restore full health (this also cancels the countdown via the status event).
 
-    if (AZeroDayCharacter* Character =
-        Cast<AZeroDayCharacter>(UGameplayStatics::GetPlayerPawn(this, 0)))
-    {
-        if (UZeroDayAudioComponent* AudioComponent =
-            Character->GetAudioComponent())
-        {
-            AudioComponent->PlayWallRepaired(GetActorLocation());
-        }
-    }
+	if (AZeroDayCharacter* Character = // The player, who owns the audio component.
+		Cast<AZeroDayCharacter>(UGameplayStatics::GetPlayerPawn(this, 0))) // Player 0's pawn.
+	{
+		if (UZeroDayAudioComponent* AudioComponent = // The sound player.
+			Character->GetAudioComponent())
+		{
+			AudioComponent->PlayWallRepaired(GetActorLocation()); // Play the repair sound from the wall.
+		}
+	}
 
-    if (GameMode)
-    {
-        GameMode->RecordWallFixed();
-    }
+	if (GameMode) // If there is a game mode to tell...
+	{
+		GameMode->RecordWallFixed(); // ...count the fix for the result screen.
+	}
 
-    return true;
+	return true; // Tell the caller the fix worked.
 }
 
 // Convenience passthrough to the Breachable component.
@@ -381,27 +390,27 @@ void AWallActor::ValidateInbound(int32& OutReal, int32& OutFalsePositives, EThre
 // Announce every change, swap the artwork, then start or stop the breach countdown.
 void AWallActor::HandleStatusChanged(EWallStatus NewStatus)
 {
-    UpdateVisuals();
-    OnStatusUpdated.Broadcast(this, NewStatus);
+	UpdateVisuals(); // Show intact, cracked or broken artwork.
+	OnStatusUpdated.Broadcast(this, NewStatus); // Let the game mode raise an alert.
 
-    if (NewStatus == EWallStatus::Breached)
-    {
-        if (AZeroDayCharacter* Character =
-            Cast<AZeroDayCharacter>(UGameplayStatics::GetPlayerPawn(this, 0)))
-        {
-            if (UZeroDayAudioComponent* AudioComponent =
-                Character->GetAudioComponent())
-            {
-                AudioComponent->PlayWallBreached(GetActorLocation());
-            }
-        }
+	if (NewStatus == EWallStatus::Breached) // A breach starts the clock...
+	{
+		if (AZeroDayCharacter* Character = // The player, who owns the audio component.
+			Cast<AZeroDayCharacter>(UGameplayStatics::GetPlayerPawn(this, 0))) // Player 0's pawn.
+		{
+			if (UZeroDayAudioComponent* AudioComponent = // The sound player.
+				Character->GetAudioComponent())
+			{
+				AudioComponent->PlayWallBreached(GetActorLocation()); // Loud breach sound from the wall.
+			}
+		}
 
-        RemediationTimer->StartCooldown(RemediationWindowSeconds, false);
-    }
-    else
-    {
-        RemediationTimer->CancelCooldown();
-    }
+		RemediationTimer->StartCooldown(RemediationWindowSeconds, false); // ...the player must fix it in time.
+	}
+	else
+	{
+		RemediationTimer->CancelCooldown(); // Any other status means the danger has passed.
+	}
 }
 
 // Time ran out. Only counts as lost if the wall is still breached.

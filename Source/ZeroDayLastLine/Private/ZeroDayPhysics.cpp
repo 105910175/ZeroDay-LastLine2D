@@ -5,7 +5,7 @@
 namespace // Only this file uses these.
 {
 	// One row per EZeroDayMaterial, in the same order as the enum.
-	const FZeroDayMaterialSpec Specs[] = {
+	const FZeroDayMaterialSpec Specs[] = { // The table: one row per material.
 		{ TEXT("PM_Wall"),       0.90f, 0.05f, 3.0f, TEXT("Stone: rough and dead, nothing bounces off it") },
 		{ TEXT("PM_Threat"),     0.20f, 0.00f, 1.0f, TEXT("Shambling body: slippery, absorbs impacts") },
 		{ TEXT("PM_Projectile"), 0.00f, 0.80f, 0.2f, TEXT("Plasma: frictionless and bouncy") },

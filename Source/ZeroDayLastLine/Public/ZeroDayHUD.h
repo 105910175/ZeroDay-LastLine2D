@@ -24,19 +24,19 @@ public:
 private:
 	// One icon picture per resource type (indexed by EResourceType), and one for survivors.
 	// Missing pictures are replaced by plain coloured tiles.
-	UPROPERTY()
-	TArray<TObjectPtr<UTexture2D>> ResourceIcons;
+	UPROPERTY() // Reflected so the textures are not garbage collected.
+	TArray<TObjectPtr<UTexture2D>> ResourceIcons; // One icon per resource type.
 
-	UPROPERTY()
-	TObjectPtr<UTexture2D> SurvivorIcon;
+	UPROPERTY() // Reflected so the textures are not garbage collected.
+	TObjectPtr<UTexture2D> SurvivorIcon; // The survivor icon.
 
 	// A small wall-tile picture used as an icon next to each wall's row in the status panel.
-	UPROPERTY()
-	TObjectPtr<UTexture2D> WallIcon;
+	UPROPERTY() // Reflected so the textures are not garbage collected.
+	TObjectPtr<UTexture2D> WallIcon; // The wall icon.
 
 	// One icon per station kind (indexed by ECityTaskKind), used the same way.
-	UPROPERTY()
-	TArray<TObjectPtr<UTexture2D>> StationIcons;
+	UPROPERTY() // Reflected so the textures are not garbage collected.
+	TArray<TObjectPtr<UTexture2D>> StationIcons; // One icon per station kind.
 
 	void DrawTopBar(const AZeroDayGameMode& GameMode); // Title, timer and survivors.
 	void DrawResourcePanel(const AZeroDayGameMode& GameMode); // What the player is carrying and what it is for.
@@ -51,26 +51,26 @@ private:
 	void DrawEndScreen(const AZeroDayGameMode& GameMode); // Level complete / game over with results.
 
 	// Draws text horizontally centred on the screen at the given height.
-	void DrawCenteredText(const FString& Text, const FLinearColor& Color, float Y, float Scale = 1.f);
+	void DrawCenteredText(const FString& Text, const FLinearColor& Color, float Y, float Scale = 1.f); // Centred text.
 
 	// Draws a hollow square around a screen position.
-	void DrawSquare(float CenterX, float CenterY, float HalfSize, const FLinearColor& Color);
+	void DrawSquare(float CenterX, float CenterY, float HalfSize, const FLinearColor& Color); // Hollow square.
 
 	// Draws a hollow circle around a screen position.
-	void DrawRing(float CenterX, float CenterY, float Radius, const FLinearColor& Color);
+	void DrawRing(float CenterX, float CenterY, float Radius, const FLinearColor& Color); // Hollow circle.
 
 	// Draws a horizontal bar that is filled to the given fraction (0-1), with gauge-style tick marks.
-	void DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& FillColor);
+	void DrawBar(float X, float Y, float Width, float Height, float Fraction, const FLinearColor& FillColor); // Gauge bar.
 
 	// Draws one resource's small icon (a coloured tile with a letter) at the given position.
-	void DrawResourceIcon(EResourceType Type, float X, float Y, float Size);
+	void DrawResourceIcon(EResourceType Type, float X, float Y, float Size); // One resource icon.
 
 	// Draws a themed panel background: a dark fill, a thin accent border and small corner
 	// brackets in the accent colour, so the HUD's boxes read as a designed interface rather
 	// than a plain rectangle.
-	void DrawPanelFrame(float X, float Y, float Width, float Height, const FLinearColor& Accent);
+	void DrawPanelFrame(float X, float Y, float Width, float Height, const FLinearColor& Accent); // Themed panel.
 
 	// Draws part of a ring (a clockwise arc starting at 12 o'clock) covering Fraction of a
 	// full circle. Used for the level timer and the Insta Scan cooldown.
-	void DrawArc(float CenterX, float CenterY, float Radius, float Fraction, const FLinearColor& Color, float Thickness);
+	void DrawArc(float CenterX, float CenterY, float Radius, float Fraction, const FLinearColor& Color, float Thickness); // Partial ring.
 };

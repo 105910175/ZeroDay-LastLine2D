@@ -1,7 +1,7 @@
 #include "ZeroDayProjectile.h" // This class's own declaration.
 #include "ThreatPawn.h" // The thing shots are meant to hit.
-#include "ZeroDayCharacter.h"
-#include "Audio/ZeroDayAudioComponent.h"
+#include "ZeroDayCharacter.h" // The player who fired the shot.
+#include "Audio/ZeroDayAudioComponent.h" // The sound effect player.
 #include "ZeroDayPhysics.h" // The projectile's physics material.
 #include "ZeroDaySprites.h" // Helper that lays sprites flat.
 #include "PaperSprite.h" // The bolt artwork asset type.
@@ -67,38 +67,38 @@ void AZeroDayProjectile::BeginPlay()
 // Hitting a threat damages it and consumes the shot.
 void AZeroDayProjectile::HandleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-    if (AThreatPawn* Threat = Cast<AThreatPawn>(OtherActor)) // Did we touch a threat?
-    {
-        Threat->ApplyHitDamage(Damage);
-        
-        if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(GetOwner()))
-        {
-            if (UZeroDayAudioComponent* AudioComponent = Character->GetAudioComponent())
-            {
-                AudioComponent->PlayProjectileImpact(GetActorLocation());
-            }
-        }
-        
-        Destroy();
-    }
+	if (AThreatPawn* Threat = Cast<AThreatPawn>(OtherActor)) // Did we touch a threat?
+	{
+		Threat->ApplyHitDamage(Damage); // Hurt it (it removes itself when its health runs out).
+
+		if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(GetOwner())) // The player who fired this shot.
+		{
+			if (UZeroDayAudioComponent* AudioComponent = Character->GetAudioComponent()) // The sound player.
+			{
+				AudioComponent->PlayProjectileImpact(GetActorLocation()); // Play the hit sound where the shot is.
+			}
+		}
+
+		Destroy(); // The shot is used up.
+	}
 }
-        
+
 // Only fires for things the projectile blocks on (static level geometry and pickups): stop there.
 void AZeroDayProjectile::HandleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-    if (OtherComp && OtherComp->IsSimulatingPhysics())
-    {
-        const FVector Direction = MovementComp ? MovementComp->Velocity.GetSafeNormal2D() : FVector::ZeroVector;
-        OtherComp->AddImpulse(Direction * PickupKnockSpeed, NAME_None, true);
-    }
+	if (OtherComp && OtherComp->IsSimulatingPhysics()) // Did we hit something that moves under physics (a pickup)?
+	{
+		const FVector Direction = MovementComp ? MovementComp->Velocity.GetSafeNormal2D() : FVector::ZeroVector; // Which way the shot was travelling.
+		OtherComp->AddImpulse(Direction * PickupKnockSpeed, NAME_None, true); // Shove it that way.
+	}
 
-    if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(GetOwner()))
-    {
-        if (UZeroDayAudioComponent* AudioComponent = Character->GetAudioComponent())
-        {
-            AudioComponent->PlayProjectileImpact(GetActorLocation());
-        }
-    }
+	if (AZeroDayCharacter* Character = Cast<AZeroDayCharacter>(GetOwner())) // The player who fired this shot.
+	{
+		if (UZeroDayAudioComponent* AudioComponent = Character->GetAudioComponent()) // The sound player.
+		{
+			AudioComponent->PlayProjectileImpact(GetActorLocation()); // Play the hit sound where the shot is.
+		}
+	}
 
-    Destroy();
+	Destroy(); // The shot is used up.
 }

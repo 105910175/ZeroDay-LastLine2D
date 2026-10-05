@@ -85,11 +85,11 @@ namespace // Helpers and constants only this file uses.
 AZeroDayHUD::AZeroDayHUD()
 {
 	static const TCHAR* IconPaths[ZeroDayResourceTypeCount] = { // In EResourceType order.
-		TEXT("/Game/Sprites/T_pickup_intel.T_pickup_intel"),
-		TEXT("/Game/Sprites/T_pickup_patch.T_pickup_patch"),
-		TEXT("/Game/Sprites/T_pickup_food.T_pickup_food"),
-		TEXT("/Game/Sprites/T_pickup_power.T_pickup_power"),
-		TEXT("/Game/Sprites/T_pickup_medical.T_pickup_medical"),
+		TEXT("/Game/Sprites/T_pickup_intel.T_pickup_intel"), // Intel chip icon.
+		TEXT("/Game/Sprites/T_pickup_patch.T_pickup_patch"), // Patch parts icon.
+		TEXT("/Game/Sprites/T_pickup_food.T_pickup_food"), // Food crate icon.
+		TEXT("/Game/Sprites/T_pickup_power.T_pickup_power"), // Battery cell icon.
+		TEXT("/Game/Sprites/T_pickup_medical.T_pickup_medical"), // Medical case icon.
 	};
 	ResourceIcons.SetNum(ZeroDayResourceTypeCount); // One slot per resource type.
 	for (int32 Index = 0; Index < ZeroDayResourceTypeCount; ++Index) // Load each icon.
@@ -114,9 +114,9 @@ AZeroDayHUD::AZeroDayHUD()
 	}
 
 	static const TCHAR* StationIconPaths[3] = { // In ECityTaskKind order (Power, Food, Medic).
-		TEXT("/Game/Sprites/T_station_power.T_station_power"),
-		TEXT("/Game/Sprites/T_station_food.T_station_food"),
-		TEXT("/Game/Sprites/T_station_medical.T_station_medical"),
+		TEXT("/Game/Sprites/T_station_power.T_station_power"), // Generator icon.
+		TEXT("/Game/Sprites/T_station_food.T_station_food"), // Food store icon.
+		TEXT("/Game/Sprites/T_station_medical.T_station_medical"), // Medical tent icon.
 	};
 	StationIcons.SetNum(3); // One slot per station kind.
 	for (int32 Index = 0; Index < 3; ++Index) // Load each icon.
@@ -224,9 +224,9 @@ void AZeroDayHUD::DrawPanelFrame(float X, float Y, float Width, float Height, co
 
 	// Small L-shaped brackets at each corner, in a brighter version of the accent colour, like a
 	// viewfinder reticle. Purely decorative, but it is what makes a panel look designed.
-	constexpr float BracketLength = 14.f;
-	constexpr float BracketThickness = 3.f;
-	const FLinearColor Bracket(Accent.R, Accent.G, Accent.B, 0.95f);
+	constexpr float BracketLength = 14.f; // How long each corner bracket leg is.
+	constexpr float BracketThickness = 3.f; // How thick each bracket leg is.
+	const FLinearColor Bracket(Accent.R, Accent.G, Accent.B, 0.95f); // A bright version of the accent colour.
 	DrawRect(Bracket, X - 1.f, Y - 1.f, BracketLength, BracketThickness); // Top-left, horizontal leg.
 	DrawRect(Bracket, X - 1.f, Y - 1.f, BracketThickness, BracketLength); // Top-left, vertical leg.
 	DrawRect(Bracket, X + Width + 1.f - BracketLength, Y - 1.f, BracketLength, BracketThickness); // Top-right, horizontal leg.
@@ -383,7 +383,7 @@ void AZeroDayHUD::DrawStatusPanel(const AZeroDayGameMode& GameMode)
 
 		if (WallIcon) // Show the wall tile as a small icon if we have it.
 		{
-			DrawTexture(WallIcon, PanelX + 8.f, Y + 1.f, RowIconSize, RowIconSize, 0.f, 0.f, 1.f, 1.f, FLinearColor::White, BLEND_Translucent);
+			DrawTexture(WallIcon, PanelX + 8.f, Y + 1.f, RowIconSize, RowIconSize, 0.f, 0.f, 1.f, 1.f, FLinearColor::White, BLEND_Translucent); // Draw the wall picture at row height.
 		}
 		const float Health = Wall->GetHealthPercent(); // 0-1 health.
 		DrawText(FString::Printf(TEXT("%s wall"), WallSideToString(Wall->WallSide)), TextColor, PanelX + 8.f + RowIconSize + 4.f, Y, Font, 0.85f, false); // "North wall".
@@ -417,7 +417,7 @@ void AZeroDayHUD::DrawStatusPanel(const AZeroDayGameMode& GameMode)
 		UTexture2D* StationIcon = StationIcons.IsValidIndex(static_cast<int32>(Task->TaskKind)) ? StationIcons[static_cast<int32>(Task->TaskKind)].Get() : nullptr; // This station's picture, if loaded.
 		if (StationIcon) // Show it as a small icon if we have it.
 		{
-			DrawTexture(StationIcon, PanelX + 8.f, Y + 1.f, RowIconSize, RowIconSize, 0.f, 0.f, 1.f, 1.f, FLinearColor::White, BLEND_Translucent);
+			DrawTexture(StationIcon, PanelX + 8.f, Y + 1.f, RowIconSize, RowIconSize, 0.f, 0.f, 1.f, 1.f, FLinearColor::White, BLEND_Translucent); // Draw the station picture at row height.
 		}
 		DrawText(TaskKindToString(Task->TaskKind), TextColor, PanelX + 8.f + RowIconSize + 4.f, Y, Font, 0.85f, false); // Station name.
 		DrawBar(PanelX + LabelWidth, Y + 3.f, BarWidth, 12.f, Condition, HealthColor(Condition)); // Condition bar.
@@ -451,12 +451,14 @@ void AZeroDayHUD::DrawThreatMarkers()
 		}
 
 		const FVector Screen = Project(Threat->GetActorLocation()); // World position to screen position.
-		DrawSquare(Screen.X, Screen.Y, 22.f, Color); // Box around the threat.
+		const FVector EdgeScreen = Project(Threat->GetActorLocation() + FVector(Threat->GetBodyRadius(), 0.f, 0.f)); // A point on the threat's edge, so the box can match its real size.
+		const float BoxHalf = FMath::Max(22.f, FVector2D::Distance(FVector2D(Screen.X, Screen.Y), FVector2D(EdgeScreen.X, EdgeScreen.Y))); // The threat's radius in pixels (never smaller than before).
+		DrawSquare(Screen.X, Screen.Y, BoxHalf, Color); // Box around the threat.
 
 		float Width = 0.f; // Filled in by GetTextSize.
 		float Height = 0.f; // Filled in by GetTextSize.
 		GetTextSize(Label, Width, Height, Font, 0.8f); // Measure the label.
-		DrawText(Label, Color, Screen.X - Width * 0.5f, Screen.Y - 44.f, Font, 0.8f, false); // Put it above the box.
+		DrawText(Label, Color, Screen.X - Width * 0.5f, Screen.Y - BoxHalf - 22.f, Font, 0.8f, false); // Put it above the box.
 	}
 }
 
@@ -467,7 +469,9 @@ void AZeroDayHUD::DrawWorldHealthBars(const AZeroDayGameMode& GameMode)
 	{
 		const AThreatPawn* Threat = *It; // The current threat.
 		const FVector Screen = Project(Threat->GetActorLocation()); // Screen position.
-		DrawBar(Screen.X - 22.f, Screen.Y + 30.f, 44.f, 5.f, Threat->GetHealthFraction(), HealthColor(Threat->GetHealthFraction())); // Fraction only, so severity stays hidden.
+		const FVector EdgeScreen = Project(Threat->GetActorLocation() + FVector(Threat->GetBodyRadius(), 0.f, 0.f)); // A point on the threat's edge.
+		const float PixelRadius = FMath::Max(22.f, FVector2D::Distance(FVector2D(Screen.X, Screen.Y), FVector2D(EdgeScreen.X, EdgeScreen.Y))); // The threat's radius in pixels.
+		DrawBar(Screen.X - PixelRadius * 0.6f, Screen.Y + PixelRadius + 8.f, PixelRadius * 1.2f, 5.f, Threat->GetHealthFraction(), HealthColor(Threat->GetHealthFraction())); // Below the threat, wide enough to read. Fraction only, so severity stays hidden.
 	}
 
 	for (const AWallActor* Wall : GameMode.GetWalls()) // Every wall.
@@ -477,7 +481,9 @@ void AZeroDayHUD::DrawWorldHealthBars(const AZeroDayGameMode& GameMode)
 			continue; // Next wall.
 		}
 		const FVector Screen = Project(Wall->GetActorLocation()); // Screen position.
-		DrawBar(Screen.X - 60.f, Screen.Y - 62.f, 120.f, 7.f, Wall->GetHealthPercent(), HealthColor(Wall->GetHealthPercent())); // Wall health.
+		const FVector EdgeScreen = Project(Wall->GetActorLocation() + FVector(100.f * Wall->WallSizeScale, 0.f, 0.f)); // A point beyond the wall's (now thicker) edge.
+		const float BarOffset = FMath::Max(62.f, FVector2D::Distance(FVector2D(Screen.X, Screen.Y), FVector2D(EdgeScreen.X, EdgeScreen.Y)) + 14.f); // Sit the bar clear of the artwork.
+		DrawBar(Screen.X - 60.f, Screen.Y - BarOffset, 120.f, 7.f, Wall->GetHealthPercent(), HealthColor(Wall->GetHealthPercent())); // Wall health.
 	}
 
 	for (const ACityTaskActor* Task : GameMode.GetTasks()) // Every station.
@@ -488,7 +494,9 @@ void AZeroDayHUD::DrawWorldHealthBars(const AZeroDayGameMode& GameMode)
 		}
 		const float Condition = Task->GetCondition() / 100.f; // 0-1 condition.
 		const FVector Screen = Project(Task->GetActorLocation()); // Screen position.
-		DrawBar(Screen.X - 35.f, Screen.Y - 62.f, 70.f, 7.f, Condition, HealthColor(Condition)); // Station condition.
+		const FVector EdgeScreen = Project(Task->GetActorLocation() + FVector(Task->GetInteractRadius(), 0.f, 0.f)); // A point on the station's edge.
+		const float PixelRadius = FMath::Max(35.f, FVector2D::Distance(FVector2D(Screen.X, Screen.Y), FVector2D(EdgeScreen.X, EdgeScreen.Y))); // The station's radius in pixels.
+		DrawBar(Screen.X - PixelRadius * 0.7f, Screen.Y - PixelRadius - 14.f, PixelRadius * 1.4f, 7.f, Condition, HealthColor(Condition)); // Station condition, above the (now bigger) station.
 	}
 }
 
