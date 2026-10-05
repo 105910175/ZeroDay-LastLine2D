@@ -534,14 +534,25 @@ void AZeroDayGameMode::HandleTaskFailed(ACityTaskActor* FailedTask)
 // The level timer ran out with everything still standing: win.
 void AZeroDayGameMode::HandleLevelSurvived()
 {
-	if (CurrentLevel >= FZeroDayLevelConfig::MaxLevel) // Was that the last level?
-	{
-		EndGame(true, TEXT("All three levels cleared. The zero-day is contained and the city is safe.")); // Whole game won.
-	}
-	else
-	{
-		EndGame(true, FString::Printf(TEXT("Level %d cleared. The city holds."), CurrentLevel)); // Just this level won.
-	}
+    if (AZeroDayCharacter* Character =
+        Cast<AZeroDayCharacter>(
+            UGameplayStatics::GetPlayerPawn(this, 0)))
+    {
+        if (UZeroDayAudioComponent* AudioComponent =
+            Character->GetAudioComponent())
+        {
+            AudioComponent->PlayLevelWon();
+        }
+    }
+
+    if (CurrentLevel >= FZeroDayLevelConfig::MaxLevel) // Was that the last level?
+    {
+        EndGame(true, TEXT("All three levels cleared. The zero-day is contained and the city is safe.")); // Whole game won.
+    }
+    else
+    {
+        EndGame(true, FString::Printf(TEXT("Level %d cleared. The city holds."), CurrentLevel)); // Just this level won.
+    }
 }
 
 // Zero-day surge (level 3): a burst of critical threats at one randomly chosen wall.
@@ -565,13 +576,26 @@ void AZeroDayGameMode::HandleSurge()
 		return; // Skip this surge.
 	}
 
-	AThreatSpawnerActor* Chosen = Candidates[FMath::RandRange(0, Candidates.Num() - 1)]; // Pick one at random.
-	Chosen->SpawnBurst(Config.SurgeThreatCount, EThreatSeverity::Critical); // Send the critical wave.
-	PostAlert(FString::Printf(TEXT("ZERO-DAY SURGE: critical exploits inbound on the %s wall!"), WallSideToString(Chosen->TargetWall->WallSide)), FColor(255, 105, 90)); // Warn the player.
-}
+    AThreatSpawnerActor* Chosen = Candidates[FMath::RandRange(0, Candidates.Num() - 1)];
+    Chosen->SpawnBurst(Config.SurgeThreatCount, EThreatSeverity::Critical); // Send the critical wave.
 
-// Stops the timers and spawners and records the result for the HUD.
-void AZeroDayGameMode::EndGame(bool bWon, const FString& Reason)
+    // Play the surge sound when the critical wave begins.
+    if (AZeroDayCharacter* Character =
+        Cast<AZeroDayCharacter>(
+            UGameplayStatics::GetPlayerPawn(this, 0)))
+    {
+        if (UZeroDayAudioComponent* AudioComponent =
+            Character->GetAudioComponent())
+        {
+            AudioComponent->PlaySurge();
+        }
+    }
+
+    PostAlert(FString::Printf(TEXT("ZERO-DAY SURGE: critical exploits inbound on the %s wall!"), WallSideToString(Chosen->TargetWall->WallSide)), FColor(255, 105, 90)); // Warn the player.
+    }
+
+    // Stops the timers and spawners and records the result for the HUD.
+    void AZeroDayGameMode::EndGame(bool bWon, const FString& Reason)
 {
 	if (bGameEnded) // Already over?
 	{
