@@ -597,6 +597,19 @@ void AZeroDayGameMode::HandleSurge()
     // Stops the timers and spawners and records the result for the HUD.
     void AZeroDayGameMode::EndGame(bool bWon, const FString& Reason)
 {
+        if (!bWon)
+        {
+            if (AZeroDayCharacter* Character =
+                Cast<AZeroDayCharacter>(
+                    UGameplayStatics::GetPlayerPawn(this, 0)))
+            {
+                if (UZeroDayAudioComponent* AudioComponent =
+                    Character->GetAudioComponent())
+                {
+                    AudioComponent->PlayLevelLost();
+                }
+            }
+        }
 	if (bGameEnded) // Already over?
 	{
 		return; // Only end once.
