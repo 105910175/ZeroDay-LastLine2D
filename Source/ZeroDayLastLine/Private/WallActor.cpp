@@ -17,7 +17,8 @@
 
 namespace // Only this file uses these.
 {
-	constexpr float FallbackTileArtWidth = 100.f; // Used only if the sprite size cannot be read (256 pixels at the 2.56 pixels per unit the sprites use).
+	constexpr float WallArtPixelWidth = 256.f; // Every wall tile is generated 256 pixels wide (Art/generate_sprites.py). The sprite's own size getter is editor-only, so packaged builds cannot read it.
+	constexpr float FallbackTileArtWidth = 100.f; // Used if the sprite's pixels-per-unit is missing (256 pixels at the 2.56 pixels per unit the sprites use).
 	constexpr float WallBodyHeight = 60.f; // How tall the invisible collision body is (at the original size; multiplied by WallSizeScale).
 	constexpr float WallBodyDepth = 96.f; // How thick the invisible collision body is at the original size, before WallSizeScale (matches the 104px-tall artwork with its reinforced footing, so the wall reads as a solid barrier next to the player).
 	constexpr float ContactZoneHalfDepth = 160.f; // How far in front of/behind the wall a threat counts as arriving.
@@ -124,7 +125,7 @@ void AWallActor::RebuildVisuals()
 	// How wide one tile of artwork really is in the world. Paper2D draws a sprite at (pixels / PixelsPerUnrealUnit)
 	// units, and this project's sprites use 2.56 pixels per unit, so the 256 pixel tile is only 100 units wide.
 	// (The old code assumed 256 units, which left a gap between every pair of tiles.)
-	const float ArtWorldWidth = (IntactSprite && IntactSprite->GetPixelsPerUnrealUnit() > 0.f) ? IntactSprite->GetSourceSize().X / IntactSprite->GetPixelsPerUnrealUnit() : FallbackTileArtWidth; // Tile width in world units.
+	const float ArtWorldWidth = (IntactSprite && IntactSprite->GetPixelsPerUnrealUnit() > 0.f) ? WallArtPixelWidth / IntactSprite->GetPixelsPerUnrealUnit() : FallbackTileArtWidth; // Tile width in world units.
 	const int32 TileCount = FMath::Clamp(FMath::RoundToInt(WallLength / ArtWorldWidth), 1, SpriteTiles.Num()); // How many tiles fit, capped to the pool size.
 	const float TileLength = WallLength / TileCount; // Stretch each slightly so the row ends exactly at the wall's ends.
 	for (int32 Index = 0; Index < SpriteTiles.Num(); ++Index) // Every tile in the pool.
