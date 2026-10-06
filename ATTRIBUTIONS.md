@@ -18,11 +18,19 @@ Zero-Day: Last Line (COS30031 Games Programming, Assessment 2). Built in Unreal 
 | Asset | Where it is used | Source | Author / creator | Licence |
 |---|---|---|---|---|
 | Sound effects (16): `SFX_Fire`, `SFX_Scan`, `SFX_Validate`, `SFX_Pickup`, `SFX_WallHit`, `SFX_WallBreached`, `SFX_WallRepaired`, `SFX_Surge` and others | `Content/Audio/SFX/*.ogg` | Kenney, *Sci-fi Sounds* pack: https://kenney.nl/assets/sci-fi-sounds | Kenney (kenney.nl) | Creative Commons CC0 1.0 (public domain) |
-| Background music (`BackgroundMusic`) | `Content/Audio/Music/BackgroundMusic.mp3` | OpenGameArt.org, *Old Music* collection: https://opengameart.org/content/old-music (specific track: TO CONFIRM, Viresh) | Alexandr Zhelanov | Creative Commons Attribution 3.0 (CC-BY 3.0): https://creativecommons.org/licenses/by/3.0/ |
+| Background music (`BackgroundMusic`) | `Content/Audio/Music/BackgroundMusic.mp3` | OpenGameArt.org, *Old Music* collection: https://opengameart.org/content/old-music | Alexandr Zhelanov | Creative Commons Attribution 3.0 (CC-BY 3.0): https://creativecommons.org/licenses/by/3.0/ |
 | Desert ground and map textures | `Content/Environments/T_DesertGround`, `T_DesertMap` | TO CONFIRM (Viresh) | TO CONFIRM (Viresh) | TO CONFIRM (Viresh) |
-| Player character sprite sheet (`pixel_character_dark_blue`) | `Content/PlayerAnimations/` | TO CONFIRM (Viresh) | TO CONFIRM (Viresh) | TO CONFIRM (Viresh) |
+| Player character sprite sheet (`pixel_character_dark_blue`, the dark blue variant) | `Content/PlayerAnimations/` | OpenGameArt.org, *Pixel character with gun*: https://opengameart.org/content/pixel-character-with-gun | Bonsaiheldin | Creative Commons CC0 1.0 (public domain) |
 | Unreal Engine 5.8, including the Paper2D plugin and the engine's built-in cylinder mesh used as a stand-in body | Whole project | https://www.unrealengine.com | Epic Games, Inc. | Unreal Engine End User License Agreement |
 | Pillow (Python imaging library) | `Art/generate_sprites.py` draws the sprites with it | https://python-pillow.org | Jeffrey A. Clark and contributors | MIT-CMU (HPND) |
+
+### Required credit (CC-BY 3.0)
+
+The background music is licensed under CC-BY 3.0, which requires this credit to be shown with the game. It is repeated on the itch.io page and in the README.
+
+> Music: "Old Music" by Alexandr Zhelanov, from OpenGameArt.org (https://opengameart.org/content/old-music), licensed under CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/). The track was imported into Unreal Engine unchanged apart from engine import settings.
+
+The sound effects (Kenney) and the player sprite sheet (Bonsaiheldin) are CC0, so credit is not required by the licence. They are listed here as a courtesy.
 
 ## 3. References consulted
 
