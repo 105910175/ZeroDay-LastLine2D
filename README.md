@@ -85,6 +85,17 @@ Each system is a reusable component or actor, not written for a single object.
 
 Full file-by-file credit is in the development report, and every asset's source is in [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
 
+## Video timestamps
+
+| Marking area | Timestamp |
+|---|---|
+| Challenge Brief | 1:53 |
+| Core Gameplay & Progression | 4:00 |
+| Physics & Interactions | 5:32 |
+| Modular Programming | 6:59 |
+| Animation & Feedback | 8:16 |
+| Technical Delivery | 9:06 |
+
 ## Known issues
 
 - Wall and station collision bodies are larger than their drawn art, because they were set up before the sprite scale was measured.
