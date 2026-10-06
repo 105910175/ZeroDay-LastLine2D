@@ -82,7 +82,6 @@ Each system is a reusable component or actor, not written for a single object.
 | **Diesel Williams** | Gameplay code (walls, threats, spawners, stations, scan and validate, level flow, HUD), generated sprite art, physical materials, automated tests, documentation |
 | **Viresh Joshi** | Project setup, level and desert environment, player character and walking animation, all audio and its integration, video demo |
 | **Shashimal** | Video editing |
-| **Sean Wilson** | Team member (contribution to be added) |
 
 Full file-by-file credit is in the development report, and every asset's source is in [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
 
