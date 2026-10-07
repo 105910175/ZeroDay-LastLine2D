@@ -25,6 +25,22 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat") // Editable in the editor and Blueprints.
 	float MoveSpeed = 150.f; // Base speed.
 
+	// How quickly the threat accelerates toward maximum speed.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat|Physics")
+	float Acceleration = 400.f;
+
+	// How quickly the threat slows down when it has no target.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat|Physics")
+	float Deceleration = 600.f;
+
+	// Strength of knockback applied to the threat.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat|Physics")
+	float KnockbackStrength = 350.f;
+
+	// Current movement velocity.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Threat|Physics")
+	FVector CurrentVelocity = FVector::ZeroVector;
+
 	// Base health before the severity and level multipliers are applied.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Threat") // Editable in the editor and Blueprints.
 	float Health = 30.f; // Base health.
@@ -72,6 +88,10 @@ public:
 	// Called by projectiles. The threat is removed once its health runs out.
 	UFUNCTION(BlueprintCallable, Category = "Threat") // Callable from Blueprints.
 	void ApplyHitDamage(float Amount); // Lose health; die at zero.
+
+	// Pushes the threat backwards using the supplied direction.
+	UFUNCTION(BlueprintCallable, Category = "Threat|Physics")
+	void ApplyKnockback(FVector Direction);
 
 	// Damages the wall (0 for false positives) and removes the threat.
 	UFUNCTION(BlueprintCallable, Category = "Threat") // Callable from Blueprints.

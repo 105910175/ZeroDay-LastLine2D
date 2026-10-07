@@ -140,30 +140,49 @@ void AThreatPawn::InitialiseThreat(
 // Walks in a straight line at the target wall.
 void AThreatPawn::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime); // Run the base class tick first.
+	Super::Tick(DeltaTime);
 
-	if (!TargetWall) // No target means nowhere to go.
+	// Gradually slow down if there is no target.
+	if (!TargetWall)
 	{
-		return; // Stand still.
-	}
-
-	const FVector ToTarget = // Vector from us to the wall.
-		TargetWall->GetActorLocation() - GetActorLocation();
-
-	const FVector FlatDirection = FVector( // Ignore height so threats stay on the ground plane.
-		ToTarget.X, // Keep the X part.
-		ToTarget.Y, // Keep the Y part.
-		0.f // Drop the height.
-	).GetSafeNormal(); // Reduce it to a pure direction.
-
-	if (!FlatDirection.IsNearlyZero()) // Only move if we have a direction.
-	{
-		AddActorWorldOffset( // Sweep so the threat stops at solid walls instead of passing through.
-			FlatDirection * MoveSpeed * DeltaTime, // Distance this frame = direction x speed x time.
-			true // Check for collisions while moving.
+		CurrentVelocity = FMath::VInterpConstantTo(
+			CurrentVelocity,
+			FVector::ZeroVector,
+			DeltaTime,
+			Deceleration
 		);
 
-		SetActorRotation(FlatDirection.Rotation()); // Face the way we are walking.
+		if (!CurrentVelocity.IsNearlyZero())
+		{
+			AddActorWorldOffset(CurrentVelocity * DeltaTime, true);
+		}
+
+		return;
+	}
+
+	const FVector ToTarget =
+		TargetWall->GetActorLocation() - GetActorLocation();
+
+	const FVector FlatDirection = FVector(
+		ToTarget.X,
+		ToTarget.Y,
+		0.f
+	).GetSafeNormal();
+
+	if (!FlatDirection.IsNearlyZero())
+	{
+		const FVector DesiredVelocity = FlatDirection * MoveSpeed;
+
+		// Smoothly accelerate instead of instantly reaching full speed.
+		CurrentVelocity = FMath::VInterpConstantTo(
+			CurrentVelocity,
+			DesiredVelocity,
+			DeltaTime,
+			Acceleration
+		);
+
+		AddActorWorldOffset(CurrentVelocity * DeltaTime, true);
+		SetActorRotation(FlatDirection.Rotation());
 	}
 }
 
@@ -194,6 +213,17 @@ void AThreatPawn::ApplyHitDamage(float Amount)
 		}
 
 		Destroy(); // Remove the threat.
+	}
+}
+
+// Applies a short backwards velocity to the threat.
+void AThreatPawn::ApplyKnockback(FVector Direction)
+{
+	Direction.Z = 0.f;
+
+	if (!Direction.IsNearlyZero())
+	{
+		CurrentVelocity += Direction.GetSafeNormal() * KnockbackStrength;
 	}
 }
 
